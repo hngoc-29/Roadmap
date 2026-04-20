@@ -1,5 +1,9 @@
 import type { NextConfig } from "next";
 
+// Trích xuất hostname từ URL (ví dụ: loại bỏ https:// và port)
+const appUrl = process.env.NEXT_PUBLIC_APP_URL || "";
+const appHostname = appUrl.replace(/^https?:\/\//, "").split(":")[0];
+
 const nextConfig: NextConfig = {
   // Tối ưu hình ảnh cho Core Web Vitals (LCP)
   images: {
@@ -15,10 +19,15 @@ const nextConfig: NextConfig = {
   // Bật compression để giảm TTFB
   compress: true,
 
-  // Tối ưu bundle size
+  // Cấu hình Experimental
   experimental: {
     // Tối ưu loading của packages lớn
     optimizePackageImports: ["lucide-react", "reactflow", "@radix-ui/react-dialog"],
+    
+    // ✅ FIX LỖI SERVER ACTIONS TẠI ĐÂY
+    serverActions: {
+      allowedOrigins: appHostname ? [appHostname, "localhost:3000"] : ["localhost:3000"],
+    },
   },
 
   // Headers bảo mật & Cache-Control tối ưu SEO
@@ -34,7 +43,6 @@ const nextConfig: NextConfig = {
         ],
       },
       {
-        // Cache tĩnh lâu dài cho assets
         source: "/(.*)\\.(ico|png|svg|jpg|jpeg|webp|woff2)",
         headers: [
           {
@@ -46,7 +54,6 @@ const nextConfig: NextConfig = {
     ];
   },
 
-  // Redirects cơ bản để tránh duplicate content (SEO)
   async redirects() {
     return [
       {

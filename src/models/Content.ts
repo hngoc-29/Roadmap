@@ -50,7 +50,6 @@ const ContentSchema = new Schema<IContentDocument>(
       unique: true,
       trim: true,
       lowercase: true,
-      index: true,
       match: [/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Slug không hợp lệ"],
     },
     content: { type: String, default: "" },

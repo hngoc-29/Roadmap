@@ -170,7 +170,6 @@ const RoadmapSchema = new Schema<IRoadmapDocument>(
       unique: true,
       trim: true,
       lowercase: true,
-      index: true, // Đánh index để query nhanh theo slug
       match: [/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Slug không hợp lệ"],
     },
 
