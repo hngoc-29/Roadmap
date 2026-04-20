@@ -1,0 +1,159 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================================
+   GLOBAL CSS - CSS Variables & Base Styles
+   ============================================================ */
+
+@layer base {
+  :root {
+    /* ── Shadcn/UI Color System ── */
+    --background: 0 0% 100%;
+    --foreground: 224 71.4% 4.1%;
+    --card: 0 0% 100%;
+    --card-foreground: 224 71.4% 4.1%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 224 71.4% 4.1%;
+    --primary: 220.9 39.3% 11%;
+    --primary-foreground: 210 20% 98%;
+    --secondary: 220 14.3% 95.9%;
+    --secondary-foreground: 220.9 39.3% 11%;
+    --muted: 220 14.3% 95.9%;
+    --muted-foreground: 220 8.9% 46.1%;
+    --accent: 220 14.3% 95.9%;
+    --accent-foreground: 220.9 39.3% 11%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 20% 98%;
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 224 71.4% 4.1%;
+    --radius: 0.5rem;
+
+    /* ── Custom: Roadmap Node Colors ── */
+    --node-default: 220 14.3% 95.9%;
+    --node-completed: 142.1 76.2% 36.3%;
+    --node-active: 217.2 91.2% 59.8%;
+    --node-locked: 220 8.9% 70%;
+
+    /* ── React Flow custom variables ── */
+    --rf-node-border-radius: 12px;
+    --rf-node-padding: 12px 16px;
+  }
+
+  .dark {
+    --background: 224 71.4% 4.1%;
+    --foreground: 210 20% 98%;
+    --card: 224 71.4% 4.1%;
+    --card-foreground: 210 20% 98%;
+    --popover: 224 71.4% 4.1%;
+    --popover-foreground: 210 20% 98%;
+    --primary: 210 20% 98%;
+    --primary-foreground: 220.9 39.3% 11%;
+    --secondary: 215 27.9% 16.9%;
+    --secondary-foreground: 210 20% 98%;
+    --muted: 215 27.9% 16.9%;
+    --muted-foreground: 217.9 10.6% 64.9%;
+    --accent: 215 27.9% 16.9%;
+    --accent-foreground: 210 20% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 20% 98%;
+    --border: 215 27.9% 16.9%;
+    --input: 215 27.9% 16.9%;
+    --ring: 216 12.2% 83.9%;
+
+    --node-default: 215 27.9% 16.9%;
+    --node-completed: 142.1 70.6% 45.3%;
+    --node-active: 213.3 93.9% 67.8%;
+    --node-locked: 220 8.9% 46.1%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    /* Tối ưu font rendering → CLS (Cumulative Layout Shift) */
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* ✅ Giảm CLS: Đặt chiều cao cố định cho các container lớn */
+  #roadmap-canvas {
+    height: calc(100vh - 64px); /* 64px = navbar height */
+  }
+}
+
+/* ============================================================
+   REACT FLOW CUSTOM STYLES
+   ============================================================ */
+@layer components {
+  /* Custom Node Styles */
+  .roadmap-node {
+    @apply bg-card border-2 border-border rounded-xl shadow-sm
+           transition-all duration-200 cursor-pointer select-none;
+    min-width: 160px;
+    max-width: 220px;
+  }
+
+  .roadmap-node:hover {
+    @apply border-primary shadow-md scale-105;
+  }
+
+  .roadmap-node.selected {
+    @apply border-primary shadow-lg ring-2 ring-primary/30;
+  }
+
+  .roadmap-node--completed {
+    @apply border-green-500 bg-green-50 dark:bg-green-950/30;
+  }
+
+  .roadmap-node--active {
+    @apply border-blue-500 bg-blue-50 dark:bg-blue-950/30;
+  }
+
+  .roadmap-node--locked {
+    @apply border-gray-300 bg-gray-50 dark:bg-gray-900/50 opacity-60 cursor-not-allowed;
+  }
+
+  /* React Flow override: bỏ background mặc định */
+  .react-flow__node {
+    border-radius: var(--rf-node-border-radius) !important;
+  }
+
+  .react-flow__edge-path {
+    stroke-width: 2;
+  }
+}
+
+/* ============================================================
+   PROSE (MDX Content) - dùng @tailwindcss/typography
+   ============================================================ */
+@layer components {
+  .prose-content {
+    @apply prose prose-slate dark:prose-invert max-w-none;
+    @apply prose-headings:scroll-mt-20 prose-headings:font-bold;
+    @apply prose-a:text-primary prose-a:no-underline hover:prose-a:underline;
+    @apply prose-code:before:content-none prose-code:after:content-none;
+    @apply prose-pre:bg-muted prose-pre:border prose-pre:border-border;
+  }
+}
+
+/* ============================================================
+   ANIMATIONS - Performance: prefer transform & opacity (GPU)
+   ============================================================ */
+@layer utilities {
+  .animate-in {
+    animation: fade-in 0.3s ease-out;
+  }
+
+  /* Skeleton loading để tránh layout shift */
+  .skeleton {
+    @apply animate-pulse bg-muted rounded;
+  }
+}
