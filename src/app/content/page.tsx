@@ -8,7 +8,7 @@ import Link from "next/link";
 import { getAllContent } from "@/actions/content";
 import type { IContent } from "@/types";
 
-export const revalidate = 60;
+export const dynamic = "force-dynamic"; // ✅ FIX: luôn fetch mới
 
 export const metadata: Metadata = {
   title: "Thư viện nội dung",

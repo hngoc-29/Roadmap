@@ -25,7 +25,7 @@ import {
   estimateReadingTime,
 } from "@/lib/utils";
 
-export const revalidate = 3600;
+export const dynamic = "force-dynamic"; // ✅ FIX: luôn fetch mới
 
 // ── generateStaticParams ──
 export async function generateStaticParams() {
@@ -194,6 +194,14 @@ export default async function BlogPostPage({
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Draft banner */}
+      {!post.isPublished && (
+        <div className="w-full bg-yellow-50 dark:bg-yellow-900/20 border-b border-yellow-200 dark:border-yellow-800 px-4 py-2 flex items-center justify-center gap-2 text-sm text-yellow-800 dark:text-yellow-300">
+          <span>📝</span>
+          <span className="font-medium">Chế độ Draft</span>
+          <span className="text-yellow-600 dark:text-yellow-400 ml-1 hidden sm:inline">— Bài viết này chưa được xuất bản.</span>
+        </div>
+      )}
       {/* JSON-LD */}
       <script
         type="application/ld+json"

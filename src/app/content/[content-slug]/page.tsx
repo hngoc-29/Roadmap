@@ -15,7 +15,7 @@ import rehypeHighlight from "rehype-highlight";
 import { getContentBySlug, getLinkedRoadmaps, getAllContentSlugs } from "@/actions/content";
 import { getCanonicalUrl, extractExcerpt, estimateReadingTime } from "@/lib/utils";
 
-export const revalidate = 3600;
+export const dynamic = "force-dynamic"; // ✅ FIX: luôn fetch mới
 
 // ── Static Params ──
 export async function generateStaticParams() {

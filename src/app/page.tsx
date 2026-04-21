@@ -12,7 +12,7 @@ import { formatViewCount, estimateReadingTime } from "@/lib/utils";
 import { WebSiteJsonLd } from "@/components/JsonLd";
 import type { IRoadmap, IPost } from "@/types";
 
-export const revalidate = 60;
+export const dynamic = "force-dynamic"; // ✅ FIX: luôn fetch mới
 
 export const metadata: Metadata = {
   title: "Khám phá Roadmap & Blog học lập trình",
@@ -141,15 +141,28 @@ export default async function HomePage() {
                   className="group block border border-border rounded-xl p-6 hover:shadow-md
                              hover:border-primary/50 transition-all duration-200 bg-card"
                 >
-                  <div className="flex items-center justify-between mb-3">
-                    {roadmap.category && (
-                      <span className="text-xs font-medium px-2.5 py-1 bg-primary/10 text-primary rounded-full">
-                        {roadmap.category}
+                  <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {roadmap.isPublished ? (
+                        <span className="text-xs font-medium px-2 py-0.5 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 rounded-full">
+                          ✅ Public
+                        </span>
+                      ) : (
+                        <span className="text-xs font-medium px-2 py-0.5 bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400 rounded-full">
+                          📝 Draft
+                        </span>
+                      )}
+                      {roadmap.category && (
+                        <span className="text-xs font-medium px-2 py-0.5 bg-primary/10 text-primary rounded-full">
+                          {roadmap.category}
+                        </span>
+                      )}
+                    </div>
+                    {roadmap.isPublished && (
+                      <span className="text-xs text-muted-foreground whitespace-nowrap">
+                        👁 {formatViewCount(roadmap.viewCount ?? 0)}
                       </span>
                     )}
-                    <span className="text-xs text-muted-foreground ml-auto">
-                      👁 {formatViewCount(roadmap.viewCount ?? 0)} lượt xem
-                    </span>
                   </div>
 
                   <h3 className="text-lg font-semibold mb-2 group-hover:text-primary transition-colors line-clamp-2">

@@ -31,7 +31,7 @@ export async function getPublishedRoadmaps() {
   await connectDB();
 
   const roadmaps = await Roadmap.find(
-    { isPublished: true },
+    {}, // ✅ FIX: Lấy tất cả (kể cả draft)
     {
       title: 1,
       slug: 1,
@@ -41,6 +41,7 @@ export async function getPublishedRoadmaps() {
       tags: 1,
       coverImage: 1,
       viewCount: 1,
+      isPublished: 1,
       createdAt: 1,
       updatedAt: 1,
       "nodes.id": 1,
@@ -61,7 +62,7 @@ export async function getPublishedRoadmaps() {
 export async function getRoadmapBySlug(slug: string) {
   await connectDB();
 
-  const roadmap = await Roadmap.findOne({ slug, isPublished: true }).lean();
+  const roadmap = await Roadmap.findOne({ slug }).lean(); // ✅ FIX: draft cũng load được
 
   if (!roadmap) return null;
   return serializeDoc(roadmap) as unknown as IRoadmap;
@@ -87,7 +88,7 @@ export async function getNodeBySlug(roadmapSlug: string, nodeSlug: string) {
   await connectDB();
 
   const roadmap = await Roadmap.findOne(
-    { slug: roadmapSlug, isPublished: true },
+    { slug: roadmapSlug }, // ✅ FIX: draft cũng load được
     {
       title: 1,
       slug: 1,
@@ -260,7 +261,7 @@ export async function togglePublishRoadmap(roadmapId: string, publish: boolean) 
 export async function getAllRoadmapSlugs() {
   await connectDB();
   const roadmaps = await Roadmap.find(
-    { isPublished: true },
+    {}, // ✅ FIX: Tất cả slugs
     { slug: 1, "nodes.data.slug": 1, updatedAt: 1 }
   ).lean();
 

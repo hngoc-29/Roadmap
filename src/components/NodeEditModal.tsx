@@ -31,6 +31,12 @@ interface NodeEditModalProps {
   allNodes?: Array<{ id: string; data: RoadmapNodeData }>;
   currentEdges?: Edge[];
   onEdgesChange: (newEdges: Edge[]) => void;
+  /**
+   * isNew = true khi node vừa được tạo mới, chưa lưu vào MongoDB.
+   * Khi đó bỏ qua updateNodeContent (không có gì để update trong DB),
+   * chỉ cập nhật React state. Node sẽ vào DB khi user bấm "💾 Lưu" toolbar.
+   */
+  isNew?: boolean;
 }
 
 // ──────────────────────────────────────────────
@@ -178,6 +184,7 @@ export default function NodeEditModal({
   allNodes = [],
   currentEdges = [],
   onEdgesChange,
+  isNew = false,
 }: NodeEditModalProps) {
   // ── Tab state ──
   const [activeTab, setActiveTab] = useState<ModalTab>("basic");
@@ -294,23 +301,28 @@ export default function NodeEditModal({
 
     startTransition(async () => {
       try {
-        await updateNodeContent(roadmapId, nodeId, {
-          label: newData.label,
-          content: newData.content,
-          description: newData.description,
-          slug: newData.slug,
-          contentSlug: newData.contentSlug,
-        });
+        if (isNew) {
+          // ✅ FIX: Node mới chưa tồn tại trong MongoDB
+          // KHÔNG gọi updateNodeContent (sẽ lỗi "không tìm thấy node")
+          // Chỉ cập nhật React state — node sẽ được lưu DB khi user
+          // bấm nút "💾 Lưu" trên toolbar (gọi saveRoadmapGraph)
+        } else {
+          // Node đã tồn tại trong DB → update bình thường
+          await updateNodeContent(roadmapId, nodeId, {
+            label: newData.label,
+            content: newData.content,
+            description: newData.description,
+            slug: newData.slug,
+            contentSlug: newData.contentSlug,
+          });
+        }
 
         // Cập nhật edges nếu có thay đổi
         if (onEdgesChange) {
-          // Giữ lại tất cả edges không liên quan đến node này + edges mới của node này
           const otherEdges = currentEdges.filter(
             (e) => e.source !== nodeId && e.target !== nodeId
           );
-          // Thêm incoming edges (target = nodeId) đã có, không đổi
           const incomingEdges = currentEdges.filter((e) => e.target === nodeId);
-          // Outgoing edges mới từ node này
           const outgoingEdges = localEdges.filter((e) => e.source === nodeId);
           onEdgesChange([...otherEdges, ...incomingEdges, ...outgoingEdges]);
         }
@@ -324,7 +336,7 @@ export default function NodeEditModal({
   }, [
     label, slug, contentMode, inlineContent, contentSlug, description,
     icon, estimatedTime, difficulty, status, nodeData, roadmapId, nodeId,
-    onSave, onEdgesChange, currentEdges, localEdges,
+    isNew, onSave, onEdgesChange, currentEdges, localEdges,
   ]);
 
   const TAB_LABELS: Record<ModalTab, string> = {
@@ -352,7 +364,7 @@ export default function NodeEditModal({
           {/* ── Header ── */}
           <div className="flex items-center justify-between px-6 py-4 border-b border-border flex-shrink-0">
             <Dialog.Title className="text-lg font-semibold">
-              ✏️ Chỉnh sửa node
+              {isNew ? "✨ Tạo node mới" : "✏️ Chỉnh sửa node"}
             </Dialog.Title>
             <Dialog.Close
               className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
@@ -780,7 +792,11 @@ export default function NodeEditModal({
           {/* ── Footer ── */}
           <div className="flex items-center justify-between px-6 py-4 border-t border-border flex-shrink-0 bg-muted/30">
             <p className="text-xs text-muted-foreground">
-              {contentMode === "library" && contentSlug ? (
+              {isNew ? (
+                <span className="text-yellow-600 dark:text-yellow-400 font-medium">
+                  ⚠️ Nhớ bấm &quot;💾 Lưu&quot; trên toolbar để lưu vào database
+                </span>
+              ) : contentMode === "library" && contentSlug ? (
                 <>URL: <span className="font-mono">/content/{contentSlug}</span></>
               ) : (
                 <>URL: <span className="font-mono">/roadmap/.../{slug}</span></>
@@ -801,7 +817,7 @@ export default function NodeEditModal({
                 disabled={isPending}
                 className="px-4 py-2 text-sm font-medium rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
               >
-                {isPending ? "Đang lưu..." : "💾 Lưu node"}
+                {isPending ? "Đang lưu..." : isNew ? "✨ Thêm node" : "💾 Lưu node"}
               </button>
             </div>
           </div>

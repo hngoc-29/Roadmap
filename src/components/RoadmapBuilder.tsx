@@ -1,10 +1,9 @@
 // ============================================================
 // COMPONENTS/ROADMAP-BUILDER.TSX
 // ============================================================
-// ✅ Điều hướng thông minh: contentSlug → /content/[slug]
-//                           inline content → /roadmap/[r]/[n]
-// ✅ Publish toggle
-// ✅ Truyền allNodes + edges vào NodeEditModal để quản lý kết nối
+// ✅ FIX LAYOUT: Toolbar được đưa ra NGOÀI ReactFlow thành một
+//    bar cố định phía trên canvas — không còn đè lên title nữa.
+//    Cấu trúc: [Toolbar bar] + [ReactFlow canvas bên dưới]
 
 "use client";
 
@@ -70,13 +69,13 @@ export default function RoadmapBuilder({
   const [editingNode, setEditingNode] = useState<{
     id: string;
     data: RoadmapNodeData;
+    isNew?: boolean;
   } | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout>>(null);
 
-  // ── Điều hướng thông minh khi click node ──
   const onNodeClick: NodeMouseHandler = useCallback(
     (event, node) => {
       event.preventDefault();
@@ -122,7 +121,7 @@ export default function RoadmapBuilder({
     };
     setNodes((nds) => [...nds, newNode]);
     setTimeout(() => {
-      setEditingNode({ id: newNode.id, data: newNode.data });
+      setEditingNode({ id: newNode.id, data: newNode.data, isNew: true });
       setIsModalOpen(true);
     }, 100);
   }, [setNodes]);
@@ -195,151 +194,173 @@ export default function RoadmapBuilder({
   const allNodesForModal = nodes.map((n) => ({ id: n.id, data: n.data }));
 
   return (
+    // ✅ FIX: Wrapper bọc cả toolbar + canvas
+    // flex-col đảm bảo toolbar trên, canvas dưới — không chồng lên nhau
     <div
-      id="roadmap-canvas"
-      className="w-full relative"
+      className="w-full flex flex-col"
       style={{ height: "calc(100vh - 3.5rem)" }}
     >
-      <ReactFlow
-        nodes={nodes}
-        edges={edges}
-        onNodesChange={mode === "edit" ? onNodesChange : undefined}
-        onEdgesChange={mode === "edit" ? onEdgesChange : undefined}
-        onConnect={mode === "edit" ? onConnect : undefined}
-        onNodeClick={onNodeClick}
-        nodeTypes={nodeTypes}
-        nodesDraggable={mode === "edit"}
-        nodesConnectable={mode === "edit"}
-        elementsSelectable={mode === "edit"}
-        fitView
-        fitViewOptions={{ padding: 0.2 }}
-        minZoom={0.3}
-        maxZoom={2}
-        aria-label={`Roadmap: ${roadmap.title}`}
-        attributionPosition="bottom-right"
-      >
-        <Background variant={BackgroundVariant.Dots} gap={20} size={1} />
-        <Controls showInteractive={mode === "edit"} />
-        <MiniMap
-          nodeColor={(node) => {
-            const status = (node.data as RoadmapNodeData).status;
-            if (status === "completed") return "#22c55e";
-            if (status === "active") return "#3b82f6";
-            if (status === "locked") return "#9ca3af";
-            return "#e2e8f0";
-          }}
-          pannable
-          zoomable
-        />
+      {/* ══════════════════════════════════════════════
+          TOOLBAR BAR — nằm NGOÀI ReactFlow
+          Không còn dùng Panel nổi → không bao giờ bị che
+      ══════════════════════════════════════════════ */}
+      <div className="flex-shrink-0 border-b border-border bg-card/95 backdrop-blur-sm px-3 py-2">
+        <div className="flex items-center gap-2 flex-wrap">
 
-        {/* ── Toolbar ── */}
-        <Panel position="top-left">
-          <div className="flex items-center gap-2 bg-card border border-border rounded-xl px-3 py-2 shadow-sm flex-wrap">
-            <button
-              onClick={() => setMode(mode === "view" ? "edit" : "view")}
-              className={`text-xs font-medium px-3 py-1.5 rounded-lg transition-colors ${
-                mode === "edit"
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
-              }`}
-            >
-              {mode === "view" ? "✏️ Chỉnh sửa" : "👁️ Xem"}
-            </button>
-
-            {mode === "edit" && (
-              <>
-                <button
-                  onClick={handleAddNode}
-                  className="text-xs font-medium px-3 py-1.5 rounded-lg bg-secondary hover:bg-secondary/80 transition-colors"
-                  title="Thêm node mới"
-                >
-                  ➕ Thêm node
-                </button>
-                <button
-                  onClick={handleSave}
-                  disabled={isSaving}
-                  className="text-xs font-medium px-3 py-1.5 rounded-lg bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 transition-colors"
-                >
-                  {isSaving ? "Đang lưu..." : "💾 Lưu"}
-                </button>
-                <button
-                  onClick={handleTogglePublish}
-                  disabled={publishPending}
-                  className={`text-xs font-medium px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50 ${
-                    isPublished
-                      ? "bg-orange-100 text-orange-700 hover:bg-orange-200 dark:bg-orange-900/30 dark:text-orange-300"
-                      : "bg-blue-600 text-white hover:bg-blue-700"
-                  }`}
-                  title={isPublished ? "Chuyển về Draft" : "Xuất bản cho mọi người xem"}
-                >
-                  {publishPending
-                    ? "..."
-                    : isPublished
-                    ? "📝 Draft"
-                    : "🌐 Xuất bản"}
-                </button>
-              </>
-            )}
-
-            {/* Publish status badge */}
-            <span
-              className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                isPublished
-                  ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                  : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"
-              }`}
-            >
-              {isPublished ? "🌐 Public" : "📝 Draft"}
-            </span>
-          </div>
-
-          {saveMessage && (
-            <div className="mt-2 text-xs bg-card border border-border px-3 py-2 rounded-lg shadow-sm">
-              {saveMessage}
-            </div>
-          )}
-        </Panel>
-
-        <Panel position="top-center">
-          <h1 className="text-sm font-semibold bg-card border border-border px-4 py-2 rounded-xl shadow-sm">
-            {roadmap.title}
+          {/* ── Tên roadmap (trái) ── */}
+          <h1
+            className="text-sm font-semibold text-foreground truncate max-w-[200px] sm:max-w-xs"
+            title={roadmap.title}
+          >
+            🗺️ {roadmap.title}
           </h1>
-        </Panel>
 
-        {mode === "edit" && (
-          <Panel position="bottom-center">
-            <p className="text-xs text-muted-foreground bg-card/80 backdrop-blur-sm border border-border px-3 py-1.5 rounded-lg">
-              Click node để chỉnh sửa • Kéo từ handle để tạo kết nối • Kéo node để di chuyển
-            </p>
-          </Panel>
+          {/* ── Divider ── */}
+          <div className="w-px h-5 bg-border mx-1 hidden sm:block" />
+
+          {/* ── Mode toggle ── */}
+          <button
+            onClick={() => setMode(mode === "view" ? "edit" : "view")}
+            className={`text-xs font-medium px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap ${
+              mode === "edit"
+                ? "bg-primary text-primary-foreground"
+                : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
+            }`}
+          >
+            {mode === "view" ? "✏️ Chỉnh sửa" : "👁️ Xem"}
+          </button>
+
+          {/* ── Edit-mode buttons ── */}
+          {mode === "edit" && (
+            <>
+              <button
+                onClick={handleAddNode}
+                className="text-xs font-medium px-3 py-1.5 rounded-lg bg-secondary hover:bg-secondary/80 transition-colors whitespace-nowrap"
+              >
+                ➕ Thêm node
+              </button>
+
+              <button
+                onClick={handleSave}
+                disabled={isSaving}
+                className="text-xs font-medium px-3 py-1.5 rounded-lg bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 transition-colors whitespace-nowrap"
+              >
+                {isSaving ? "Đang lưu..." : "💾 Lưu"}
+              </button>
+
+              <button
+                onClick={handleTogglePublish}
+                disabled={publishPending}
+                className={`text-xs font-medium px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50 whitespace-nowrap ${
+                  isPublished
+                    ? "bg-orange-100 text-orange-700 hover:bg-orange-200 dark:bg-orange-900/30 dark:text-orange-300"
+                    : "bg-blue-600 text-white hover:bg-blue-700"
+                }`}
+              >
+                {publishPending
+                  ? "..."
+                  : isPublished
+                  ? "📝 Về Draft"
+                  : "🌐 Xuất bản"}
+              </button>
+            </>
+          )}
+
+          {/* ── Status badge (luôn hiển thị) ── */}
+          <span
+            className={`ml-auto text-xs px-2.5 py-1 rounded-full font-medium whitespace-nowrap ${
+              isPublished
+                ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                : "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
+            }`}
+          >
+            {isPublished ? "🌐 Public" : "📝 Draft"}
+          </span>
+        </div>
+
+        {/* ── Save message (hiện dưới toolbar) ── */}
+        {saveMessage && (
+          <p className="mt-1.5 text-xs text-muted-foreground pl-1">{saveMessage}</p>
         )}
+      </div>
 
-        {mode === "view" && (
-          <Panel position="bottom-right">
-            <div className="text-xs text-muted-foreground bg-card/80 backdrop-blur-sm border border-border px-3 py-2 rounded-lg space-y-1">
-              <div className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-green-500" /> Hoàn thành
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-blue-500" /> Đang học
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-gray-300" /> Mở khoá
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-gray-200" /> Có sẵn
-              </div>
-            </div>
-          </Panel>
-        )}
-      </ReactFlow>
+      {/* ══════════════════════════════════════════════
+          REACT FLOW CANVAS — chiếm phần còn lại
+      ══════════════════════════════════════════════ */}
+      {/* min-h-0 cần thiết để flex-1 child không vượt quá parent trong Firefox */}
+      <div className="flex-1 relative min-h-0">
+        <ReactFlow
+          nodes={nodes}
+          edges={edges}
+          onNodesChange={mode === "edit" ? onNodesChange : undefined}
+          onEdgesChange={mode === "edit" ? onEdgesChange : undefined}
+          onConnect={mode === "edit" ? onConnect : undefined}
+          onNodeClick={onNodeClick}
+          nodeTypes={nodeTypes}
+          nodesDraggable={mode === "edit"}
+          nodesConnectable={mode === "edit"}
+          elementsSelectable={mode === "edit"}
+          fitView
+          fitViewOptions={{ padding: 0.2 }}
+          minZoom={0.3}
+          maxZoom={2}
+          aria-label={`Roadmap: ${roadmap.title}`}
+          attributionPosition="bottom-right"
+          style={{ width: "100%", height: "100%" }}
+        >
+          <Background variant={BackgroundVariant.Dots} gap={20} size={1} />
+          <Controls showInteractive={mode === "edit"} />
+          <MiniMap
+            nodeColor={(node) => {
+              const status = (node.data as RoadmapNodeData).status;
+              if (status === "completed") return "#22c55e";
+              if (status === "active") return "#3b82f6";
+              if (status === "locked") return "#9ca3af";
+              return "#e2e8f0";
+            }}
+            pannable
+            zoomable
+          />
 
+          {/* Hint khi edit mode */}
+          {mode === "edit" && (
+            <Panel position="bottom-center">
+              <p className="text-xs text-muted-foreground bg-card/80 backdrop-blur-sm border border-border px-3 py-1.5 rounded-lg">
+                Click node để chỉnh sửa · Kéo handle để nối · Kéo node để di chuyển
+              </p>
+            </Panel>
+          )}
+
+          {/* Legend khi view mode */}
+          {mode === "view" && (
+            <Panel position="bottom-right">
+              <div className="text-xs text-muted-foreground bg-card/80 backdrop-blur-sm border border-border px-3 py-2 rounded-lg space-y-1">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-green-500" /> Hoàn thành
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-blue-500" /> Đang học
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-gray-300" /> Mở khoá
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-gray-200 border border-gray-300" /> Có sẵn
+                </div>
+              </div>
+            </Panel>
+          )}
+        </ReactFlow>
+      </div>
+
+      {/* Modal chỉnh sửa node */}
       {isModalOpen && editingNode && (
         <NodeEditModal
           nodeId={editingNode.id}
           nodeData={editingNode.data}
           roadmapId={roadmap._id!}
           isOpen={isModalOpen}
+          isNew={editingNode.isNew ?? false}
           onClose={() => {
             setIsModalOpen(false);
             setEditingNode(null);

@@ -39,7 +39,8 @@ export default function CreateRoadmapForm() {
           category: category || undefined,
         });
         // Redirect tới editor ngay sau khi tạo
-        router.push(`/roadmap/${roadmap.slug}`);
+        // ✅ FIX: ?mode=edit → mở ngay chế độ chỉnh sửa sau khi tạo
+        router.push(`/roadmap/${roadmap.slug}?mode=edit`);
       } catch (err) {
         setError("Có lỗi xảy ra. Vui lòng thử lại.");
         console.error(err);

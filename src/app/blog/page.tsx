@@ -10,7 +10,7 @@ import { getAllPosts } from "@/actions/post";
 import { estimateReadingTime } from "@/lib/utils";
 import type { IPost } from "@/types";
 
-export const revalidate = 60;
+export const dynamic = "force-dynamic"; // ✅ FIX: luôn fetch mới
 
 export const metadata: Metadata = {
   title: "Blog | Bài viết học lập trình",
@@ -119,12 +119,17 @@ export default async function BlogPage() {
                   )}
 
                   <div className="p-5 flex flex-col flex-1">
-                    {/* Category */}
-                    {post.category && (
-                      <span className="text-xs font-medium text-primary mb-2">
-                        {post.category}
-                      </span>
-                    )}
+                    {/* Status + Category */}
+                    <div className="flex items-center gap-2 mb-2 flex-wrap">
+                      {post.isPublished ? (
+                        <span className="text-xs font-medium px-2 py-0.5 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 rounded-full">✅ Public</span>
+                      ) : (
+                        <span className="text-xs font-medium px-2 py-0.5 bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400 rounded-full">📝 Draft</span>
+                      )}
+                      {post.category && (
+                        <span className="text-xs font-medium text-primary">{post.category}</span>
+                      )}
+                    </div>
 
                     <h2 className="font-semibold text-base mb-2 group-hover:text-primary transition-colors line-clamp-2 leading-snug">
                       {post.title}

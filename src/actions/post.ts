@@ -17,11 +17,12 @@ import { nanoid } from "nanoid";
 export async function getAllPosts(): Promise<IPost[]> {
   await connectDB();
   const posts = await Post.find(
-    { isPublished: true },
+    {}, // ✅ FIX: hiển thị cả draft
     {
       title: 1, slug: 1, description: 1,
       author: 1, category: 1, tags: 1,
       coverImage: 1, viewCount: 1,
+      isPublished: 1,
       publishedAt: 1, createdAt: 1, updatedAt: 1,
     }
   )
@@ -36,7 +37,7 @@ export async function getAllPosts(): Promise<IPost[]> {
 // ──────────────────────────────────────────────
 export async function getPostBySlug(slug: string): Promise<IPost | null> {
   await connectDB();
-  const post = await Post.findOne({ slug, isPublished: true }).lean();
+  const post = await Post.findOne({ slug }).lean(); // ✅ FIX: draft load được
   if (!post) return null;
   return serializeDoc(post) as unknown as IPost;
 }
@@ -49,7 +50,7 @@ export async function getAllPostSlugs(): Promise<
 > {
   await connectDB();
   const posts = await Post.find(
-    { isPublished: true },
+    {}, // ✅ FIX: hiển thị cả draft
     { slug: 1, updatedAt: 1 }
   ).lean();
   return serializeDoc(posts) as unknown as Array<{
@@ -64,7 +65,7 @@ export async function getAllPostSlugs(): Promise<
 export async function getPostsByCategory(category: string): Promise<IPost[]> {
   await connectDB();
   const posts = await Post.find(
-    { isPublished: true, category },
+    { category }, // ✅ FIX
     { title: 1, slug: 1, description: 1, author: 1, tags: 1, coverImage: 1, publishedAt: 1 }
   )
     .sort({ publishedAt: -1 })
