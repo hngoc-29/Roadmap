@@ -9,7 +9,10 @@ import { connectDB } from "@/lib/mongodb";
 import Post from "@/models/Post";
 import { serializeDoc, createSlug } from "@/lib/utils";
 import type { IPost } from "@/types";
-import { nanoid } from "nanoid";
+import { customAlphabet } from "nanoid";
+
+// 2705 FIX: Ch1ec9 d00f9ng k00fd t1ef1 lowercase alphanumeric 01111ec3 slug lu00f4n pass regex
+const nanoidSafe = customAlphabet("abcdefghijklmnopqrstuvwxyz0123456789", 6);
 
 // ──────────────────────────────────────────────
 // GET: Tất cả bài viết đã publish (cho trang /blog)
@@ -97,9 +100,9 @@ export async function createPost(data: {
 }): Promise<IPost> {
   await connectDB();
 
-  const baseSlug = createSlug(data.title);
+  const baseSlug = createSlug(data.title) || nanoidSafe();
   const existing = await Post.findOne({ slug: baseSlug });
-  const slug = existing ? `${baseSlug}-${nanoid(4)}` : baseSlug;
+  const slug = existing ? `${baseSlug}-${nanoidSafe()}` : baseSlug;
 
   const doc = await Post.create({
     title: data.title,

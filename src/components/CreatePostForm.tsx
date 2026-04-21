@@ -60,7 +60,7 @@ export default function CreatePostForm() {
         });
         router.push(`/blog/${post.slug}`);
       } catch (err) {
-        setError("Có lỗi xảy ra. Vui lòng thử lại.");
+        setError(err instanceof Error ? err.message : "Có lỗi xảy ra. Vui lòng thử lại.");
         console.error(err);
       }
     });

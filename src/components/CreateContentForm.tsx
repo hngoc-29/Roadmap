@@ -56,7 +56,7 @@ export default function CreateContentForm() {
         });
         router.push(`/content/${created.slug}`);
       } catch (err) {
-        setError("Có lỗi xảy ra. Vui lòng thử lại.");
+        setError(err instanceof Error ? err.message : "Có lỗi xảy ra. Vui lòng thử lại.");
         console.error(err);
       }
     });

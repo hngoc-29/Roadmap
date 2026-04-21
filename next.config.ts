@@ -17,6 +17,13 @@ const nextConfig: NextConfig = {
       "reactflow",
       "@radix-ui/react-dialog",
     ],
+    // ✅ FIX: Cho phép Server Actions khi chạy qua tunnel (GitHub Codespaces, ngrok, ...)
+    serverActions: {
+      allowedOrigins: [
+        "localhost:3000",
+        "opulent-waffle-wr7jg47qvqgwf575r-3000.app.github.dev",
+      ],
+    },
   },
 
   async headers() {

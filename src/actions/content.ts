@@ -14,7 +14,10 @@ import Content from "@/models/Content";
 import Roadmap from "@/models/Roadmap";
 import { serializeDoc, createSlug } from "@/lib/utils";
 import type { IContent } from "@/types";
-import { nanoid } from "nanoid";
+import { customAlphabet } from "nanoid";
+
+// ✅ FIX: Chỉ dùng ký tự lowercase alphanumeric để slug luôn pass regex
+const nanoidSafe = customAlphabet("abcdefghijklmnopqrstuvwxyz0123456789", 6);
 
 // ──────────────────────────────────────────────
 // GET: Lấy tất cả content (cho thư viện /content)
@@ -138,9 +141,9 @@ export async function createContent(data: {
 }) {
   await connectDB();
 
-  const baseSlug = createSlug(data.title);
+  const baseSlug = createSlug(data.title) || nanoidSafe();
   const existing = await Content.findOne({ slug: baseSlug });
-  const slug = existing ? `${baseSlug}-${nanoid(4)}` : baseSlug;
+  const slug = existing ? `${baseSlug}-${nanoidSafe()}` : baseSlug;
 
   const doc = await Content.create({
     title: data.title,
@@ -190,4 +193,16 @@ export async function getAllContentSlugs(): Promise<
   await connectDB();
   const contents = await Content.find({}, { slug: 1, updatedAt: 1 }).lean();
   return serializeDoc(contents) as unknown as Array<{ slug: string; updatedAt: string }>;
+}
+// ──────────────────────────────────────────────
+// DELETE: Xóa content
+// ──────────────────────────────────────────────
+export async function deleteContent(id: string): Promise<{ success: boolean }> {
+  await connectDB();
+  const doc = await Content.findByIdAndDelete(id).lean() as { slug: string } | null;
+  if (!doc) throw new Error("Không tìm thấy content");
+
+  revalidatePath(`/content/${doc.slug}`);
+  revalidatePath("/content");
+  return { success: true };
 }

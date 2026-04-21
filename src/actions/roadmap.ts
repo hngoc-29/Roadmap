@@ -11,7 +11,10 @@ import { connectDB } from "@/lib/mongodb";
 import Roadmap from "@/models/Roadmap";
 import { serializeDoc, createSlug } from "@/lib/utils";
 import type { IRoadmap } from "@/types";
-import { nanoid } from "nanoid";
+import { customAlphabet } from "nanoid";
+
+// ✅ FIX: Chỉ dùng ký tự lowercase alphanumeric để slug luôn pass regex
+const nanoidSafe = customAlphabet("abcdefghijklmnopqrstuvwxyz0123456789", 6);
 
 // Helper: lấy session hoặc throw
 async function requireAuth() {
@@ -147,9 +150,9 @@ export async function createRoadmap(data: {
   const session = await requireAuth();
   await connectDB();
 
-  const slug = createSlug(data.title);
-  const existing = await Roadmap.findOne({ slug });
-  const finalSlug = existing ? `${slug}-${nanoid(4)}` : slug;
+  const baseSlug = createSlug(data.title) || nanoidSafe();
+  const existing = await Roadmap.findOne({ slug: baseSlug });
+  const finalSlug = existing ? `${baseSlug}-${nanoidSafe()}` : baseSlug;
 
   const userId = (session.user as { id?: string } | undefined)?.id;
   const userEmail = session.user?.email ?? "";
@@ -168,7 +171,7 @@ export async function createRoadmap(data: {
     isPublished: false,
     nodes: [
       {
-        id: nanoid(),
+        id: nanoidSafe(),
         type: "roadmapNode",
         position: { x: 250, y: 100 },
         data: {
@@ -337,6 +340,35 @@ export async function checkEditPermission(roadmapId: string) {
   await connectDB();
   const can = await canEditRoadmap(roadmapId);
   return { canEdit: can };
+}
+
+// ──────────────────────────────────────────────
+// DELETE: Xóa Roadmap (chỉ owner)
+// ──────────────────────────────────────────────
+export async function deleteRoadmap(roadmapId: string): Promise<{ success: boolean }> {
+  await connectDB();
+
+  const session = await requireAuth();
+  const userId = (session.user as { id?: string } | undefined)?.id;
+  const userEmail = session.user?.email ?? "";
+
+  const roadmap = await Roadmap.findById(roadmapId, { ownerId: 1, ownerEmail: 1, slug: 1 }).lean() as {
+    ownerId?: string; ownerEmail?: string; slug: string;
+  } | null;
+
+  if (!roadmap) throw new Error("Không tìm thấy roadmap");
+
+  const isOwner =
+    (roadmap.ownerId && roadmap.ownerId === userId) ||
+    (roadmap.ownerEmail && roadmap.ownerEmail === userEmail);
+
+  if (!isOwner) throw new Error("Chỉ chủ sở hữu mới có thể xóa roadmap");
+
+  await Roadmap.findByIdAndDelete(roadmapId);
+
+  revalidatePath("/");
+  revalidatePath(`/roadmap/${roadmap.slug}`);
+  return { success: true };
 }
 
 // ──────────────────────────────────────────────

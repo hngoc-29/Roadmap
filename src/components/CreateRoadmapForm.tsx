@@ -4,7 +4,7 @@
 
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { createRoadmap } from "@/actions/roadmap";
@@ -16,15 +16,21 @@ const CATEGORIES = [
 
 export default function CreateRoadmapForm() {
   const router = useRouter();
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState("");
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  // Tự động lấy tên từ session
-  const [authorName, setAuthorName] = useState(session?.user?.name ?? "");
+  const [authorName, setAuthorName] = useState("");
   const [category, setCategory] = useState("");
+
+  // ✅ FIX: Sync authorName sau khi session load xong
+  useEffect(() => {
+    if (session?.user?.name && !authorName) {
+      setAuthorName(session.user.name);
+    }
+  }, [session?.user?.name]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -100,8 +106,9 @@ export default function CreateRoadmapForm() {
             type="text"
             value={authorName}
             onChange={(e) => setAuthorName(e.target.value)}
-            placeholder="Tên của bạn"
-            className="w-full border border-input bg-background rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+            placeholder={status === "loading" ? "Đang tải..." : "Tên của bạn"}
+            disabled={status === "loading"}
+            className="w-full border border-input bg-background rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-60"
           />
           {session?.user?.name && authorName === session.user.name && (
             <p className="text-xs text-muted-foreground mt-1">
@@ -137,7 +144,7 @@ export default function CreateRoadmapForm() {
 
       <button
         type="submit"
-        disabled={isPending}
+        disabled={isPending || status === "loading"}
         className="w-full py-3 text-sm font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors"
       >
         {isPending ? "Đang tạo..." : "🚀 Tạo Roadmap"}
