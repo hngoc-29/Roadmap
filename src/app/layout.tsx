@@ -1,23 +1,11 @@
 // ============================================================
 // APP/LAYOUT.TSX - Root Layout với SEO Metadata & NavBar
 // ============================================================
+// ✅ Dùng local font (không phụ thuộc network khi build)
 
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
 import NavBar from "@/components/NavBar";
 import "./globals.css";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-  display: "swap",
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-  display: "swap",
-});
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -78,14 +66,10 @@ export const metadata: Metadata = {
 
 export default function RootLayout({
   children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+}: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="vi" suppressHydrationWarning>
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen bg-background`}
-      >
+      <body className="antialiased min-h-screen bg-background font-sans">
         <a
           href="#main-content"
           className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-50
@@ -94,10 +78,7 @@ export default function RootLayout({
         >
           Bỏ qua đến nội dung chính
         </a>
-
-        {/* ✅ Global navbar – hiển thị trên tất cả trang */}
         <NavBar />
-
         <main id="main-content">{children}</main>
       </body>
     </html>

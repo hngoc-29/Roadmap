@@ -216,7 +216,7 @@ const RoadmapSchema = new Schema<IRoadmapDocument>(
       virtuals: true,
       transform(_, ret) {
         ret.id = ret._id.toString();
-        delete (ret as any).__v;
+        delete (ret as Record<string, unknown>).__v;
         return ret;
       },
     },
@@ -262,6 +262,3 @@ const Roadmap: Model<IRoadmapDocument> =
   models.Roadmap ?? mongoose.model<IRoadmapDocument>("Roadmap", RoadmapSchema);
 
 export default Roadmap;
-
-// Index cho query backlinks: tìm roadmaps dùng 1 contentSlug
-RoadmapSchema.index({ "nodes.data.contentSlug": 1 });

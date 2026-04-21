@@ -1,19 +1,25 @@
 // ============================================================
 // APP/API/REVALIDATE/ROUTE.TS - On-Demand ISR Revalidation
 // ============================================================
-// ✅ Gọi API này khi publish roadmap mới để rebuild pages ngay lập tức
-// ✅ Bảo vệ bằng secret key
-// 
-// Usage: POST /api/revalidate
-// Body: { "secret": "...", "slug": "ten-roadmap" }
+// POST /api/revalidate
+// Body: { "secret": "...", "type": "roadmap"|"blog"|"content", "slug": "...", "nodeSlug"?: "..." }
+//
+// Dùng khi publish nội dung mới để rebuild pages ngay lập tức
 
 import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath, revalidateTag } from "next/cache";
 
+type RevalidateType = "roadmap" | "blog" | "content";
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { secret, slug, nodeSlug } = body;
+    const { secret, slug, nodeSlug, type = "roadmap" } = body as {
+      secret: string;
+      slug: string;
+      nodeSlug?: string;
+      type?: RevalidateType;
+    };
 
     // ✅ Xác thực secret key
     if (secret !== process.env.REVALIDATION_SECRET) {
@@ -24,28 +30,42 @@ export async function POST(request: NextRequest) {
     }
 
     if (!slug) {
-      return NextResponse.json(
-        { error: "slug is required" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "slug is required" }, { status: 400 });
     }
 
-    // Revalidate trang roadmap
-    revalidatePath(`/roadmap/${slug}`);
+    const revalidated: string[] = [];
 
-    // Nếu có nodeSlug, revalidate trang bài học đó
-    if (nodeSlug) {
-      revalidatePath(`/roadmap/${slug}/${nodeSlug}`);
+    if (type === "roadmap") {
+      revalidatePath(`/roadmap/${slug}`);
+      revalidated.push(`/roadmap/${slug}`);
+
+      if (nodeSlug) {
+        revalidatePath(`/roadmap/${slug}/${nodeSlug}`);
+        revalidated.push(`/roadmap/${slug}/${nodeSlug}`);
+      }
+
+      revalidatePath("/");
+      revalidateTag("roadmaps");
+      revalidated.push("/", "tag:roadmaps");
+    } else if (type === "blog") {
+      revalidatePath(`/blog/${slug}`);
+      revalidatePath("/blog");
+      revalidatePath("/");
+      revalidateTag("posts");
+      revalidated.push(`/blog/${slug}`, "/blog", "/", "tag:posts");
+    } else if (type === "content") {
+      revalidatePath(`/content/${slug}`);
+      revalidatePath("/content");
+      revalidateTag("contents");
+      revalidated.push(`/content/${slug}`, "/content", "tag:contents");
     }
-
-    // Revalidate trang chủ (danh sách roadmaps)
-    revalidatePath("/");
-    revalidateTag("roadmaps");
 
     return NextResponse.json({
       revalidated: true,
+      type,
       slug,
       nodeSlug: nodeSlug ?? null,
+      paths: revalidated,
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
@@ -57,7 +77,6 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Chỉ cho phép POST
 export async function GET() {
   return NextResponse.json({ error: "Method not allowed" }, { status: 405 });
 }

@@ -25,13 +25,16 @@ import {
   estimateReadingTime,
 } from "@/lib/utils";
 
-// ✅ FIX: force-dynamic thay vì revalidate=3600
-export const dynamic = "force-dynamic";
+export const revalidate = 3600;
 
 // ── generateStaticParams ──
 export async function generateStaticParams() {
-  const slugs = await getAllPostSlugs();
-  return slugs.map((s) => ({ "blog-slug": s.slug }));
+  try {
+    const slugs = await getAllPostSlugs();
+    return slugs.map((s) => ({ "blog-slug": s.slug }));
+  } catch {
+    return [];
+  }
 }
 
 // ── generateMetadata ──
@@ -191,17 +194,6 @@ export default async function BlogPostPage({
 
   return (
     <div className="min-h-screen bg-background">
-      {/* ✅ FIX: Draft banner - bài viết chưa publish */}
-      {!post.isPublished && (
-        <div className="w-full bg-yellow-50 dark:bg-yellow-900/20 border-b border-yellow-200 dark:border-yellow-800 px-4 py-2.5 flex items-center justify-center gap-2 text-sm text-yellow-800 dark:text-yellow-300">
-          <span>📝</span>
-          <span className="font-medium">Chế độ Draft</span>
-          <span className="text-yellow-600 dark:text-yellow-400 ml-1">
-            — Bài viết này chưa được xuất bản. Chỉ bạn mới thấy được trang này.
-          </span>
-        </div>
-      )}
-
       {/* JSON-LD */}
       <script
         type="application/ld+json"

@@ -17,7 +17,7 @@ import { nanoid } from "nanoid";
 export async function getAllPosts(): Promise<IPost[]> {
   await connectDB();
   const posts = await Post.find(
-    { }, // ✅ FIX: Hiển thị cả draft
+    { isPublished: true },
     {
       title: 1, slug: 1, description: 1,
       author: 1, category: 1, tags: 1,
@@ -36,8 +36,7 @@ export async function getAllPosts(): Promise<IPost[]> {
 // ──────────────────────────────────────────────
 export async function getPostBySlug(slug: string): Promise<IPost | null> {
   await connectDB();
-  // ✅ FIX: Bỏ isPublished filter → post draft vừa tạo load được
-  const post = await Post.findOne({ slug }).lean();
+  const post = await Post.findOne({ slug, isPublished: true }).lean();
   if (!post) return null;
   return serializeDoc(post) as unknown as IPost;
 }
@@ -50,7 +49,7 @@ export async function getAllPostSlugs(): Promise<
 > {
   await connectDB();
   const posts = await Post.find(
-    {}, // ✅ FIX: Tất cả slugs kể cả draft
+    { isPublished: true },
     { slug: 1, updatedAt: 1 }
   ).lean();
   return serializeDoc(posts) as unknown as Array<{
@@ -65,7 +64,7 @@ export async function getAllPostSlugs(): Promise<
 export async function getPostsByCategory(category: string): Promise<IPost[]> {
   await connectDB();
   const posts = await Post.find(
-    { category }, // ✅ FIX
+    { isPublished: true, category },
     { title: 1, slug: 1, description: 1, author: 1, tags: 1, coverImage: 1, publishedAt: 1 }
   )
     .sort({ publishedAt: -1 })
@@ -133,7 +132,7 @@ export async function updatePost(
   await connectDB();
 
   // Nếu publish lần đầu thì set publishedAt
-  const existing = await Post.findById(id).lean() as any;
+  const existing = await Post.findById(id).lean() as { isPublished?: boolean } | null;
   const publishedAt =
     data.isPublished && existing && !existing.isPublished
       ? new Date()
@@ -166,7 +165,7 @@ export async function updatePost(
 // ──────────────────────────────────────────────
 export async function deletePost(id: string): Promise<{ success: boolean }> {
   await connectDB();
-  const doc = await Post.findByIdAndDelete(id).lean() as any;
+  const doc = await Post.findByIdAndDelete(id).lean() as { slug: string } | null;
   if (!doc) throw new Error("Không tìm thấy bài viết");
 
   revalidatePath("/blog");
@@ -184,34 +183,6 @@ export async function getDraftPosts(): Promise<IPost[]> {
     { title: 1, slug: 1, description: 1, author: 1, createdAt: 1, updatedAt: 1 }
   )
     .sort({ updatedAt: -1 })
-    .lean();
-  return serializeDoc(posts) as unknown as IPost[];
-}
-
-// ──────────────────────────────────────────────
-// GET: Tìm kiếm blog posts (cho LibraryPicker trong NodeEditModal)
-// ──────────────────────────────────────────────
-export async function searchPosts(query: string): Promise<IPost[]> {
-  await connectDB();
-  const trimmed = query.trim();
-
-  if (!trimmed) {
-    const posts = await Post.find(
-      {},
-      { title: 1, slug: 1, description: 1, isPublished: 1, category: 1, tags: 1 }
-    )
-      .sort({ createdAt: -1 })
-      .limit(10)
-      .lean();
-    return serializeDoc(posts) as unknown as IPost[];
-  }
-
-  const regex = new RegExp(trimmed, "i");
-  const posts = await Post.find(
-    { $or: [{ title: regex }, { description: regex }, { tags: regex }, { category: regex }] },
-    { title: 1, slug: 1, description: 1, isPublished: 1, category: 1, tags: 1 }
-  )
-    .limit(15)
     .lean();
   return serializeDoc(posts) as unknown as IPost[];
 }

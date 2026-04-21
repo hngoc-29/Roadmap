@@ -73,7 +73,7 @@ const ContentSchema = new Schema<IContentDocument>(
       virtuals: true,
       transform(_, ret) {
         ret.id = ret._id.toString();
-        delete (ret as any).__v;
+        delete (ret as Record<string, unknown>).__v;
         return ret;
       },
     },

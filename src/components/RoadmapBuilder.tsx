@@ -1,9 +1,10 @@
 // ============================================================
 // COMPONENTS/ROADMAP-BUILDER.TSX
-// Fix 1: Tên roadmap không còn che nút lưu (đưa vào toolbar)
-// Fix 2: Node mới tạo cục bộ không gọi updateNodeContent (isNew)
-// Fix 3: Navigate tới /blog/[slug] nếu postSlug tồn tại
 // ============================================================
+// ✅ Điều hướng thông minh: contentSlug → /content/[slug]
+//                           inline content → /roadmap/[r]/[n]
+// ✅ Publish toggle
+// ✅ Truyền allNodes + edges vào NodeEditModal để quản lý kết nối
 
 "use client";
 
@@ -66,32 +67,28 @@ export default function RoadmapBuilder({
     }))
   );
 
-  const [editingNode, setEditingNode] = useState<{ id: string; data: RoadmapNodeData } | null>(null);
+  const [editingNode, setEditingNode] = useState<{
+    id: string;
+    data: RoadmapNodeData;
+  } | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  // ✅ Fix 2: Track node mới tạo cục bộ chưa lưu DB
-  // ✅ Track TẤT CẢ node IDs chưa lưu DB (dùng Set để xử lý đúng khi mở lại modal)
-  const [newNodeIds, setNewNodeIds] = useState<Set<string>>(new Set());
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout>>(null);
 
-  // ── Navigate thông minh khi click node ──
+  // ── Điều hướng thông minh khi click node ──
   const onNodeClick: NodeMouseHandler = useCallback(
     (event, node) => {
       event.preventDefault();
       if (mode === "view") {
         const nodeData = node.data as RoadmapNodeData;
         if (nodeData.status === "locked") return;
-        // ✅ Fix 3: Ưu tiên postSlug → /blog/[slug]
-        if (nodeData.postSlug) {
-          router.push(`/blog/${nodeData.postSlug}`);
-        } else if (nodeData.contentSlug) {
+        if (nodeData.contentSlug) {
           router.push(`/content/${nodeData.contentSlug}`);
         } else if (nodeData.content || nodeData.slug) {
           router.push(`/roadmap/${roadmap.slug}/${nodeData.slug}`);
         }
       } else {
-        // isNew được tính từ newNodeIds set, không cần set thủ công
         setEditingNode({ id: node.id, data: node.data as RoadmapNodeData });
         setIsModalOpen(true);
       }
@@ -125,8 +122,6 @@ export default function RoadmapBuilder({
     };
     setNodes((nds) => [...nds, newNode]);
     setTimeout(() => {
-      // ✅ Thêm vào set node chưa lưu DB
-      setNewNodeIds((prev) => new Set(prev).add(newNode.id));
       setEditingNode({ id: newNode.id, data: newNode.data });
       setIsModalOpen(true);
     }, 100);
@@ -139,18 +134,21 @@ export default function RoadmapBuilder({
     try {
       await saveRoadmapGraph(roadmap._id!, {
         nodes: nodes.map((n) => ({
-          id: n.id, type: n.type, position: n.position,
+          id: n.id,
+          type: n.type,
+          position: n.position,
           data: n.data as RoadmapNodeData,
         })),
         edges: edges.map((e) => ({
-          id: e.id, source: e.source, target: e.target,
-          type: e.type, animated: e.animated,
+          id: e.id,
+          source: e.source,
+          target: e.target,
+          type: e.type,
+          animated: e.animated,
           label: e.label as string | undefined,
         })),
       });
       setSaveMessage("✅ Đã lưu!");
-      // ✅ Xoá set sau khi đã lưu DB thành công
-      setNewNodeIds(new Set());
     } catch (error) {
       setSaveMessage("❌ Lỗi khi lưu.");
       console.error(error);
@@ -188,14 +186,20 @@ export default function RoadmapBuilder({
   );
 
   const handleEdgesChangeFromModal = useCallback(
-    (newEdges: typeof edges) => { setEdges(newEdges); },
+    (newEdges: typeof edges) => {
+      setEdges(newEdges);
+    },
     [setEdges]
   );
 
   const allNodesForModal = nodes.map((n) => ({ id: n.id, data: n.data }));
 
   return (
-    <div id="roadmap-canvas" className="w-full relative" style={{ height: "calc(100vh - 3.5rem)" }}>
+    <div
+      id="roadmap-canvas"
+      className="w-full relative"
+      style={{ height: "calc(100vh - 3.5rem)" }}
+    >
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -228,17 +232,9 @@ export default function RoadmapBuilder({
           zoomable
         />
 
-        {/* ── Toolbar + Title gộp chung ── */}
-        {/* ✅ Fix 1: Tên roadmap nằm trong cùng toolbar → không che nút */}
+        {/* ── Toolbar ── */}
         <Panel position="top-left">
-          <div className="flex items-center gap-2 bg-card border border-border rounded-xl px-3 py-2 shadow-sm flex-wrap max-w-[calc(100vw-2rem)]">
-            {/* Tên roadmap */}
-            <span className="text-sm font-semibold truncate max-w-[160px]" title={roadmap.title}>
-              {roadmap.title}
-            </span>
-
-            <div className="w-px h-4 bg-border" />
-
+          <div className="flex items-center gap-2 bg-card border border-border rounded-xl px-3 py-2 shadow-sm flex-wrap">
             <button
               onClick={() => setMode(mode === "view" ? "edit" : "view")}
               className={`text-xs font-medium px-3 py-1.5 rounded-lg transition-colors ${
@@ -255,6 +251,7 @@ export default function RoadmapBuilder({
                 <button
                   onClick={handleAddNode}
                   className="text-xs font-medium px-3 py-1.5 rounded-lg bg-secondary hover:bg-secondary/80 transition-colors"
+                  title="Thêm node mới"
                 >
                   ➕ Thêm node
                 </button>
@@ -273,12 +270,18 @@ export default function RoadmapBuilder({
                       ? "bg-orange-100 text-orange-700 hover:bg-orange-200 dark:bg-orange-900/30 dark:text-orange-300"
                       : "bg-blue-600 text-white hover:bg-blue-700"
                   }`}
+                  title={isPublished ? "Chuyển về Draft" : "Xuất bản cho mọi người xem"}
                 >
-                  {publishPending ? "..." : isPublished ? "📝 Draft" : "🌐 Xuất bản"}
+                  {publishPending
+                    ? "..."
+                    : isPublished
+                    ? "📝 Draft"
+                    : "🌐 Xuất bản"}
                 </button>
               </>
             )}
 
+            {/* Publish status badge */}
             <span
               className={`text-xs px-2 py-0.5 rounded-full font-medium ${
                 isPublished
@@ -297,6 +300,12 @@ export default function RoadmapBuilder({
           )}
         </Panel>
 
+        <Panel position="top-center">
+          <h1 className="text-sm font-semibold bg-card border border-border px-4 py-2 rounded-xl shadow-sm">
+            {roadmap.title}
+          </h1>
+        </Panel>
+
         {mode === "edit" && (
           <Panel position="bottom-center">
             <p className="text-xs text-muted-foreground bg-card/80 backdrop-blur-sm border border-border px-3 py-1.5 rounded-lg">
@@ -308,10 +317,18 @@ export default function RoadmapBuilder({
         {mode === "view" && (
           <Panel position="bottom-right">
             <div className="text-xs text-muted-foreground bg-card/80 backdrop-blur-sm border border-border px-3 py-2 rounded-lg space-y-1">
-              <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-green-500" /> Hoàn thành</div>
-              <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-blue-500" /> Đang học</div>
-              <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-gray-300" /> Mở khoá</div>
-              <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-gray-200" /> Có sẵn</div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-green-500" /> Hoàn thành
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-blue-500" /> Đang học
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-gray-300" /> Mở khoá
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-gray-200" /> Có sẵn
+              </div>
             </div>
           </Panel>
         )}
@@ -323,7 +340,6 @@ export default function RoadmapBuilder({
           nodeData={editingNode.data}
           roadmapId={roadmap._id!}
           isOpen={isModalOpen}
-          isNew={editingNode ? newNodeIds.has(editingNode.id) : false}
           onClose={() => {
             setIsModalOpen(false);
             setEditingNode(null);

@@ -83,7 +83,7 @@ const PostSchema = new Schema<IPostDocument>(
       virtuals: true,
       transform(_, ret) {
         ret.id = ret._id.toString();
-        delete (ret as any).__v;
+        delete (ret as Record<string, unknown>).__v;
         return ret;
       },
     },

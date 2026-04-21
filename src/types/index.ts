@@ -10,10 +10,10 @@ import type { Node as RFNode, Edge as RFEdge } from "reactflow";
 export interface RoadmapNodeData {
   label: string;
   slug: string;
-  // contentSlug → link tới Content collection (/content/[slug])
+  // ✅ MỚI: contentSlug → link tới Content collection (/content/[slug])
+  // Nếu có contentSlug, node navigate tới /content/[contentSlug]
+  // Nếu không, fallback về inline /roadmap/[roadmap]/[node]
   contentSlug?: string;
-  // postSlug → link tới Blog Post (/blog/[slug])
-  postSlug?: string;
   content: string;
   description?: string;
   status?: "locked" | "available" | "active" | "completed";
@@ -143,7 +143,7 @@ export interface IPost {
   author: { name: string; avatar?: string };
   category?: string;
   tags?: string[];
-  relatedRoadmaps?: string[];
+  relatedRoadmaps?: string[]; // slugs của roadmap liên quan
   resources?: Array<{
     title: string;
     url: string;

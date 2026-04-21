@@ -31,7 +31,8 @@ export default function BuilderNewPage() {
             🚀 Tạo Roadmap mới
           </h1>
           <p className="text-muted-foreground">
-            Điền thông tin cơ bản. Sau khi tạo, bạn có thể thêm nodes và nội dung trong editor trực quan.
+            Điền thông tin cơ bản. Sau khi tạo, bạn có thể thêm nodes và
+            nội dung trong editor trực quan.
           </p>
         </div>
 
@@ -45,20 +46,20 @@ export default function BuilderNewPage() {
           <h3 className="text-sm font-semibold mb-3">💡 Mẹo tạo Roadmap hiệu quả</h3>
           <ul className="space-y-2 text-sm text-muted-foreground">
             <li>
-              <strong className="text-foreground">Tiêu đề rõ ràng</strong> – 
-              {' VD: "Lộ trình học Backend Node.js 2025" dễ tìm kiếm hơn "Backend"'}
+              <strong className="text-foreground">Tiêu đề rõ ràng</strong> –
+              VD: &quot;Lộ trình học Backend Node.js 2025&quot; dễ tìm kiếm hơn &quot;Backend&quot;
             </li>
             <li>
-              <strong className="text-foreground">Mô tả đầy đủ</strong> – 
-              {' Google dùng mô tả này cho snippet tìm kiếm (≤160 ký tự tốt nhất)'}
+              <strong className="text-foreground">Mô tả đầy đủ</strong> –
+              Google dùng mô tả này cho snippet tìm kiếm (≤160 ký tự tốt nhất)
             </li>
             <li>
-              <strong className="text-foreground">Chọn danh mục</strong> – 
+              <strong className="text-foreground">Chọn danh mục</strong> –
               Giúp người dùng tìm roadmap theo lĩnh vực
             </li>
             <li>
-              <strong className="text-foreground">Bắt đầu từ ít nodes</strong> – 
-              {' 5–10 nodes là vừa đủ, sau đó thêm dần theo nhu cầu'}
+              <strong className="text-foreground">Bắt đầu từ ít nodes</strong> –
+              5–10 nodes là vừa đủ, sau đó thêm dần theo nhu cầu
             </li>
           </ul>
         </div>

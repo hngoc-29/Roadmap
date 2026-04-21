@@ -15,13 +15,16 @@ import rehypeHighlight from "rehype-highlight";
 import { getContentBySlug, getLinkedRoadmaps, getAllContentSlugs } from "@/actions/content";
 import { getCanonicalUrl, extractExcerpt, estimateReadingTime } from "@/lib/utils";
 
-// ✅ FIX: force-dynamic thay vì revalidate=3600
-export const dynamic = "force-dynamic";
+export const revalidate = 3600;
 
 // ── Static Params ──
 export async function generateStaticParams() {
-  const slugs = await getAllContentSlugs();
-  return slugs.map((s) => ({ "content-slug": s.slug }));
+  try {
+    const slugs = await getAllContentSlugs();
+    return slugs.map((s) => ({ "content-slug": s.slug }));
+  } catch {
+    return [];
+  }
 }
 
 // ── Metadata ──

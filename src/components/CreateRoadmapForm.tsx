@@ -1,8 +1,6 @@
 // ============================================================
 // COMPONENTS/CREATE-ROADMAP-FORM.TSX
 // ============================================================
-// ✅ FIX: Sau khi tạo → redirect tới ?mode=edit
-//         Roadmap mới sẽ mở ngay ở chế độ chỉnh sửa
 
 "use client";
 
@@ -40,9 +38,8 @@ export default function CreateRoadmapForm() {
           authorName: authorName.trim(),
           category: category || undefined,
         });
-        // ✅ FIX: Redirect với ?mode=edit → mở ngay chế độ chỉnh sửa
-        // Người dùng vừa tạo xong cần edit ngay, không phải xem
-        router.push(`/roadmap/${roadmap.slug}?mode=edit`);
+        // Redirect tới editor ngay sau khi tạo
+        router.push(`/roadmap/${roadmap.slug}`);
       } catch (err) {
         setError("Có lỗi xảy ra. Vui lòng thử lại.");
         console.error(err);
@@ -67,10 +64,9 @@ export default function CreateRoadmapForm() {
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          placeholder='VD: Lộ trình học Frontend 2025'
+          placeholder="VD: Lộ trình học Frontend 2025"
           className="w-full border border-input bg-background rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
           maxLength={200}
-          autoFocus
         />
         <p className="text-xs text-muted-foreground mt-1">{title.length}/200</p>
       </div>
@@ -107,7 +103,9 @@ export default function CreateRoadmapForm() {
           />
         </div>
         <div>
-          <label className="block text-sm font-medium mb-1.5">Danh mục</label>
+          <label className="block text-sm font-medium mb-1.5">
+            Danh mục
+          </label>
           <select
             value={category}
             onChange={(e) => setCategory(e.target.value)}
@@ -122,12 +120,12 @@ export default function CreateRoadmapForm() {
       </div>
 
       {/* Info box */}
-      <div className="rounded-lg border border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-900/20 px-4 py-3 text-sm">
-        <p className="font-medium text-blue-800 dark:text-blue-300 mb-1">ℹ️ Sau khi tạo:</p>
-        <ul className="space-y-0.5 list-disc list-inside text-xs text-blue-700 dark:text-blue-400">
-          <li>Bạn được chuyển thẳng vào <strong>chế độ chỉnh sửa</strong></li>
-          <li>Roadmap ở trạng thái <strong>Draft</strong> — chỉ bạn thấy</li>
-          <li>Dùng nút <strong>🌐 Xuất bản</strong> để public cho mọi người</li>
+      <div className="rounded-lg border border-border bg-muted/50 px-4 py-3 text-sm text-muted-foreground">
+        <p className="font-medium text-foreground mb-1">ℹ️ Sau khi tạo:</p>
+        <ul className="space-y-0.5 list-disc list-inside text-xs">
+          <li>Roadmap sẽ ở chế độ <strong>Draft</strong> (chưa publish)</li>
+          <li>Bạn được chuyển thẳng vào <strong>editor</strong> để thêm nodes</li>
+          <li>Nhấn <strong>Xuất bản</strong> khi muốn public cho mọi người xem</li>
         </ul>
       </div>
 
@@ -137,15 +135,7 @@ export default function CreateRoadmapForm() {
         disabled={isPending}
         className="w-full py-3 text-sm font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors"
       >
-        {isPending ? (
-          <span className="flex items-center justify-center gap-2">
-            <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-            </svg>
-            Đang tạo...
-          </span>
-        ) : "🚀 Tạo Roadmap & bắt đầu chỉnh sửa"}
+        {isPending ? "Đang tạo..." : "🚀 Tạo Roadmap"}
       </button>
     </form>
   );

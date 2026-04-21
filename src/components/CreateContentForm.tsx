@@ -1,31 +1,29 @@
 // ============================================================
 // COMPONENTS/CREATE-CONTENT-FORM.TSX
 // ============================================================
-// Form tạo Content mới trong thư viện
-// Sau khi tạo → redirect tới /content/[slug] để xem kết quả
+// Form tạo Content Library item độc lập
 
 "use client";
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { createContent } from "@/actions/content";
 import type { IContent } from "@/types";
 
-const DIFFICULTIES: { value: IContent["difficulty"]; label: string; color: string }[] = [
-  { value: "beginner", label: "🟢 Cơ bản", color: "text-green-700" },
-  { value: "intermediate", label: "🟡 Trung cấp", color: "text-yellow-700" },
-  { value: "advanced", label: "🔴 Nâng cao", color: "text-red-700" },
+const DIFFICULTIES: { value: IContent["difficulty"]; label: string }[] = [
+  { value: "beginner", label: "🟢 Cơ bản" },
+  { value: "intermediate", label: "🟡 Trung cấp" },
+  { value: "advanced", label: "🔴 Nâng cao" },
 ];
 
-type PreviewTab = "edit" | "preview";
+const ICONS = ["📄", "📚", "⚡", "🔥", "🎯", "🛠️", "🌐", "⚛️", "🗄️", "🔐", "☁️", "🤖"];
 
 export default function CreateContentForm() {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
 
-  // Form fields
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [content, setContent] = useState("");
@@ -33,13 +31,12 @@ export default function CreateContentForm() {
   const [difficulty, setDifficulty] = useState<IContent["difficulty"]>("beginner");
   const [estimatedTime, setEstimatedTime] = useState("");
   const [tagsInput, setTagsInput] = useState("");
-  const [previewTab, setPreviewTab] = useState<PreviewTab>("edit");
+  const [showIconPicker, setShowIconPicker] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim()) { setError("Vui lòng nhập tiêu đề nội dung"); return; }
+    if (!title.trim()) { setError("Vui lòng nhập tiêu đề"); return; }
     setError("");
-    setSuccess("");
 
     const tags = tagsInput
       .split(",")
@@ -48,24 +45,18 @@ export default function CreateContentForm() {
 
     startTransition(async () => {
       try {
-        const doc = await createContent({
+        const created = await createContent({
           title: title.trim(),
-          description: description.trim() || undefined,
+          description: description.trim(),
           content: content.trim() || undefined,
-          icon: icon.trim() || "📄",
+          icon,
           difficulty,
           estimatedTime: estimatedTime.trim() || undefined,
           tags,
         });
-
-        setSuccess(`✅ Đã tạo "${doc.title}" thành công!`);
-
-        // Redirect sau 800ms để user thấy success message
-        setTimeout(() => {
-          router.push(`/content/${doc.slug}`);
-        }, 800);
+        router.push(`/content/${created.slug}`);
       } catch (err) {
-        setError("Có lỗi xảy ra khi tạo nội dung. Vui lòng thử lại.");
+        setError("Có lỗi xảy ra. Vui lòng thử lại.");
         console.error(err);
       }
     });
@@ -78,25 +69,34 @@ export default function CreateContentForm() {
           {error}
         </div>
       )}
-      {success && (
-        <div className="text-sm text-green-700 bg-green-50 border border-green-200 dark:bg-green-900/20 dark:border-green-800 dark:text-green-400 rounded-lg px-4 py-3 flex items-center gap-2">
-          {success}
-          <span className="text-xs opacity-70 ml-auto">Đang chuyển hướng...</span>
-        </div>
-      )}
 
       {/* Icon + Title */}
-      <div className="flex gap-3">
-        <div className="w-24">
-          <label className="block text-xs font-medium text-muted-foreground mb-1.5">Icon</label>
-          <input
-            type="text"
-            value={icon}
-            onChange={(e) => setIcon(e.target.value)}
-            className="w-full border border-input bg-background rounded-lg px-3 py-2 text-center text-xl focus:outline-none focus:ring-2 focus:ring-ring"
-            placeholder="📄"
-            maxLength={2}
-          />
+      <div className="flex gap-3 items-start">
+        <div className="shrink-0">
+          <label className="block text-sm font-medium mb-1.5">Icon</label>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setShowIconPicker(!showIconPicker)}
+              className="w-14 h-11 border border-input bg-background rounded-lg text-2xl flex items-center justify-center hover:bg-muted transition-colors"
+            >
+              {icon}
+            </button>
+            {showIconPicker && (
+              <div className="absolute top-full left-0 mt-1 z-20 bg-card border border-border rounded-xl p-3 shadow-lg grid grid-cols-4 gap-1 w-40">
+                {ICONS.map((ic) => (
+                  <button
+                    key={ic}
+                    type="button"
+                    onClick={() => { setIcon(ic); setShowIconPicker(false); }}
+                    className={`w-8 h-8 text-xl rounded-lg hover:bg-muted transition-colors ${icon === ic ? "bg-primary/10" : ""}`}
+                  >
+                    {ic}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
         <div className="flex-1">
           <label className="block text-sm font-medium mb-1.5">
@@ -106,10 +106,9 @@ export default function CreateContentForm() {
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder='VD: Giới thiệu về React Hooks'
+            placeholder="VD: JavaScript Async/Await toàn tập"
             className="w-full border border-input bg-background rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
             maxLength={200}
-            autoFocus
           />
         </div>
       </div>
@@ -117,13 +116,13 @@ export default function CreateContentForm() {
       {/* Description */}
       <div>
         <label className="block text-sm font-medium mb-1.5">
-          Mô tả ngắn
-          <span className="text-muted-foreground font-normal ml-1">(SEO meta description)</span>
+          Mô tả ngắn{" "}
+          <span className="text-muted-foreground font-normal">(meta description)</span>
         </label>
         <textarea
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          placeholder="Tóm tắt nội dung bài học trong 1–2 câu..."
+          placeholder="Tóm tắt nội dung, tối đa 300 ký tự..."
           rows={2}
           maxLength={300}
           className="w-full border border-input bg-background rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring"
@@ -131,7 +130,26 @@ export default function CreateContentForm() {
         <p className="text-xs text-muted-foreground text-right mt-1">{description.length}/300</p>
       </div>
 
-      {/* Difficulty + EstimatedTime */}
+      {/* Content */}
+      <div>
+        <label className="block text-sm font-medium mb-1.5">
+          Nội dung{" "}
+          <span className="text-muted-foreground font-normal">(Markdown)</span>
+        </label>
+        <textarea
+          value={content}
+          onChange={(e) => setContent(e.target.value)}
+          placeholder={`# ${title || "Tiêu đề"}\n\n## Giới thiệu\n\n...\n\n## Nội dung chính\n\n\`\`\`javascript\n// Code example\n\`\`\``}
+          rows={14}
+          className="w-full border border-input bg-background rounded-lg px-3 py-2 text-sm font-mono resize-y focus:outline-none focus:ring-2 focus:ring-ring"
+          spellCheck={false}
+        />
+        <p className="text-xs text-muted-foreground mt-1">
+          Hỗ trợ đầy đủ Markdown với syntax highlighting
+        </p>
+      </div>
+
+      {/* Difficulty + Time */}
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium mb-1.5">Mức độ</label>
@@ -151,7 +169,7 @@ export default function CreateContentForm() {
             type="text"
             value={estimatedTime}
             onChange={(e) => setEstimatedTime(e.target.value)}
-            placeholder="VD: 30 phút, 2 giờ"
+            placeholder="VD: 2 giờ, 30 phút"
             className="w-full border border-input bg-background rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
           />
         </div>
@@ -160,97 +178,35 @@ export default function CreateContentForm() {
       {/* Tags */}
       <div>
         <label className="block text-sm font-medium mb-1.5">
-          Tags <span className="text-muted-foreground font-normal">(phân cách bằng dấu phẩy)</span>
+          Tags{" "}
+          <span className="text-muted-foreground font-normal">(phân cách bằng dấu phẩy)</span>
         </label>
         <input
           type="text"
           value={tagsInput}
           onChange={(e) => setTagsInput(e.target.value)}
-          placeholder="react, hooks, javascript, frontend"
+          placeholder="javascript, async, promise, es6"
           className="w-full border border-input bg-background rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
         />
-        {/* Tag preview */}
-        {tagsInput && (
-          <div className="flex flex-wrap gap-1.5 mt-2">
-            {tagsInput.split(",").map((t) => t.trim().toLowerCase()).filter(Boolean).map((tag) => (
-              <span key={tag} className="text-xs px-2 py-0.5 bg-secondary text-secondary-foreground rounded-md">#{tag}</span>
-            ))}
-          </div>
-        )}
       </div>
 
-      {/* Markdown Content Editor + Preview */}
-      <div>
-        <div className="flex items-center justify-between mb-1.5">
-          <label className="text-sm font-medium">
-            Nội dung <span className="text-muted-foreground font-normal">(Markdown)</span>
-          </label>
-          <div className="flex gap-1 bg-muted rounded-lg p-1">
-            {(["edit", "preview"] as PreviewTab[]).map((tab) => (
-              <button
-                key={tab}
-                type="button"
-                onClick={() => setPreviewTab(tab)}
-                className={`text-xs px-3 py-1 rounded-md transition-colors ${
-                  previewTab === tab
-                    ? "bg-background shadow-sm text-foreground"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {tab === "edit" ? "📝 Soạn thảo" : "👁️ Preview"}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {previewTab === "edit" ? (
-          <textarea
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            rows={14}
-            className="w-full border border-input bg-background rounded-lg px-3 py-2 text-sm font-mono resize-y focus:outline-none focus:ring-2 focus:ring-ring"
-            placeholder={`# ${title || "Tiêu đề bài học"}\n\n## Giới thiệu\n\nNhập nội dung Markdown ở đây...\n\n## Nội dung chính\n\n- Điểm 1\n- Điểm 2\n\n\`\`\`javascript\n// Code example\nconsole.log("Hello!");\n\`\`\`\n\n## Tóm tắt\n\n...`}
-            spellCheck={false}
-          />
-        ) : (
-          <div className="min-h-[200px] max-h-[350px] overflow-y-auto border border-border rounded-lg p-4 text-sm">
-            {content ? (
-              <div className="space-y-1.5">
-                {content.split("\n").map((line, i) => {
-                  if (line.startsWith("# ")) return <h1 key={i} className="text-2xl font-bold mt-4 mb-2">{line.slice(2)}</h1>;
-                  if (line.startsWith("## ")) return <h2 key={i} className="text-lg font-semibold mt-3 mb-1">{line.slice(3)}</h2>;
-                  if (line.startsWith("### ")) return <h3 key={i} className="text-base font-medium mt-2 mb-1">{line.slice(4)}</h3>;
-                  if (line.startsWith("- ") || line.startsWith("* ")) return <p key={i} className="ml-4">• {line.slice(2)}</p>;
-                  if (line.startsWith("```")) return <div key={i} className="text-xs text-muted-foreground">— code block —</div>;
-                  if (line === "") return <div key={i} className="h-2" />;
-                  return <p key={i} className="leading-relaxed">{line}</p>;
-                })}
-              </div>
-            ) : (
-              <p className="text-muted-foreground italic">Chưa có nội dung để preview...</p>
-            )}
-          </div>
-        )}
-        <p className="text-xs text-muted-foreground mt-1">
-          Hỗ trợ Markdown đầy đủ: heading, danh sách, code blocks, bảng, blockquote...
+      {/* Info */}
+      <div className="rounded-lg border border-border bg-muted/50 px-4 py-3 text-sm text-muted-foreground">
+        <p className="font-medium text-foreground mb-1">ℹ️ Content Library vs Blog Post</p>
+        <p className="text-xs">
+          Content này có URL <span className="font-mono">/content/[slug]</span> và có thể được
+          gắn vào bất kỳ <strong>node</strong> nào trong Roadmap để tái sử dụng. Nếu bạn muốn
+          viết bài có tác giả, ngày đăng, hãy dùng{" "}
+          <Link href="/blog/new" className="text-primary hover:underline">Blog Post</Link> thay thế.
         </p>
       </div>
 
-      {/* Submit */}
       <button
         type="submit"
         disabled={isPending}
         className="w-full py-3 text-sm font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors"
       >
-        {isPending ? (
-          <span className="flex items-center justify-center gap-2">
-            <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
-            </svg>
-            Đang tạo nội dung...
-          </span>
-        ) : "📄 Tạo nội dung"}
+        {isPending ? "Đang tạo..." : "📄 Tạo Content"}
       </button>
     </form>
   );

@@ -1,9 +1,7 @@
 // ============================================================
-// COMPONENTS/CUSTOM-ROADMAP-NODE.TSX - Custom React Flow Node
+// COMPONENTS/CUSTOM-ROADMAP-NODE.TSX
 // ============================================================
-// ✅ Giao diện đẹp cho mỗi node trong Roadmap
-// ✅ Visual feedback theo status (completed/active/locked)
-// ✅ Memo để tránh re-render không cần thiết
+// ✅ Proper padding, status colours, hover, memo
 
 "use client";
 
@@ -12,115 +10,144 @@ import { Handle, Position, type NodeProps } from "reactflow";
 import type { RoadmapNodeData } from "@/types";
 import { cn } from "@/lib/utils";
 
-// Status → màu sắc mapping
-const STATUS_STYLES: Record<string, string> = {
-  completed:
-    "border-green-400 bg-green-50 dark:bg-green-950/30 dark:border-green-600",
-  active:
-    "border-blue-400 bg-blue-50 dark:bg-blue-950/30 dark:border-blue-500",
-  locked:
-    "border-gray-200 bg-gray-50 dark:bg-gray-900/50 dark:border-gray-700 opacity-60",
-  available: "border-border bg-card",
-};
-
-const STATUS_ICON: Record<string, string> = {
-  completed: "✅",
-  active: "🔵",
-  locked: "🔒",
+const STATUS_RING: Record<string, string> = {
+  completed: "ring-2 ring-green-400/40 dark:ring-green-500/40",
+  active:    "ring-2 ring-blue-400/50  dark:ring-blue-400/50",
+  locked:    "",
   available: "",
 };
 
-// ✅ memo(): Component chỉ re-render khi props thực sự thay đổi
+const STATUS_CARD: Record<string, string> = {
+  completed: "border-green-400  bg-green-50   dark:bg-green-950/40  dark:border-green-600",
+  active:    "border-blue-400   bg-blue-50    dark:bg-blue-950/40   dark:border-blue-500",
+  locked:    "border-gray-200   bg-gray-50/80 dark:bg-gray-900/60   dark:border-gray-700 opacity-55",
+  available: "border-border     bg-card",
+};
+
+const STATUS_DOT: Record<string, string> = {
+  completed: "bg-green-500",
+  active:    "bg-blue-500 animate-pulse",
+  locked:    "bg-gray-400",
+  available: "",
+};
+
+const STATUS_DOT_ICON: Record<string, string> = {
+  completed: "✓",
+  active:    "▶",
+  locked:    "🔒",
+  available: "",
+};
+
+const DIFF_BADGE: Record<string, string> = {
+  beginner:     "bg-green-100  text-green-700  dark:bg-green-900/40  dark:text-green-300",
+  intermediate: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300",
+  advanced:     "bg-red-100    text-red-700    dark:bg-red-900/40    dark:text-red-300",
+};
+
 const CustomRoadmapNode = memo(({ data, selected }: NodeProps<RoadmapNodeData>) => {
-  const status = data.status ?? "available";
-  const statusStyle = STATUS_STYLES[status] ?? STATUS_STYLES.available;
-  const statusIcon = STATUS_ICON[status];
+  const status  = data.status   ?? "available";
+  const cardCls = STATUS_CARD[status] ?? STATUS_CARD.available;
+  const ringCls = STATUS_RING[status] ?? "";
+  const dotCls  = STATUS_DOT[status];
+  const dotIcon = STATUS_DOT_ICON[status];
 
   return (
     <>
-      {/* Handle trên (input) - nơi kết nối đến từ node khác */}
+      {/* ── Top handle (incoming connection) ── */}
       <Handle
         type="target"
         position={Position.Top}
-        className="!w-3 !h-3 !bg-muted-foreground !border-2 !border-background"
+        className="!w-3 !h-3 !bg-muted-foreground/60 !border-2 !border-background hover:!bg-primary transition-colors"
       />
 
-      {/* Node body */}
+      {/* ── Node card ── */}
       <div
         className={cn(
-          "roadmap-node relative",
-          statusStyle,
+          "roadmap-node relative select-none",
+          cardCls,
+          ringCls,
           selected && "ring-2 ring-primary ring-offset-2",
           status === "locked" && "cursor-not-allowed"
         )}
         role="button"
         aria-label={`${data.label}${status === "locked" ? " (đã khóa)" : ""}`}
-        aria-pressed={status === "active"}
       >
-        {/* Status indicator dot */}
-        {status !== "available" && (
-          <div
+        {/* Status dot badge */}
+        {dotIcon && (
+          <span
             className={cn(
-              "absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full border-2 border-background flex items-center justify-center text-xs",
-              status === "completed" && "bg-green-500",
-              status === "active" && "bg-blue-500",
-              status === "locked" && "bg-gray-400"
+              "absolute -top-2 -right-2 w-5 h-5 rounded-full",
+              "border-2 border-background flex items-center justify-center",
+              "text-white text-[10px] font-bold leading-none shadow-sm",
+              dotCls
             )}
             aria-hidden
           >
-            <span className="text-[10px]">
-              {status === "completed" ? "✓" : status === "active" ? "▶" : "🔒"}
-            </span>
-          </div>
+            {status !== "locked" ? dotIcon : ""}
+          </span>
         )}
 
-        {/* Icon */}
-        <div className="flex items-center gap-2 mb-1">
+        {/* ── Header row: icon + label ── */}
+        <div className="flex items-start gap-2 mb-1.5">
           {data.icon && (
-            <span className="text-lg leading-none" aria-hidden>
+            <span className="text-xl leading-none shrink-0 mt-0.5" aria-hidden>
               {data.icon}
             </span>
           )}
-          {statusIcon && <span aria-hidden>{statusIcon}</span>}
+          <p className="text-sm font-semibold leading-tight line-clamp-2 break-words min-w-0">
+            {data.label}
+          </p>
         </div>
 
-        {/* Label */}
-        <p className="text-sm font-semibold leading-tight line-clamp-2">
-          {data.label}
-        </p>
-
-        {/* Description preview */}
+        {/* Description */}
         {data.description && (
-          <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+          <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed mb-1.5">
             {data.description}
           </p>
         )}
 
-        {/* Meta: thời gian ước tính */}
-        {data.estimatedTime && (
-          <p className="text-xs text-muted-foreground mt-1.5 flex items-center gap-1">
-            ⏱️ {data.estimatedTime}
-          </p>
-        )}
+        {/* ── Meta row ── */}
+        <div className="flex flex-wrap items-center gap-1.5 mt-1">
+          {data.difficulty && (
+            <span
+              className={cn(
+                "text-[10px] font-medium px-1.5 py-0.5 rounded-full leading-none",
+                DIFF_BADGE[data.difficulty] ?? ""
+              )}
+            >
+              {data.difficulty === "beginner"
+                ? "Cơ bản"
+                : data.difficulty === "intermediate"
+                ? "Trung cấp"
+                : "Nâng cao"}
+            </span>
+          )}
+
+          {data.estimatedTime && (
+            <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
+              ⏱ {data.estimatedTime}
+            </span>
+          )}
+        </div>
 
         {/* Content library indicator */}
         {data.contentSlug && (
-          <p className="text-xs text-blue-500 dark:text-blue-400 mt-1 flex items-center gap-1">
-            🔗 content library
-          </p>
+          <div className="mt-1.5 flex items-center gap-1 text-[10px] text-blue-500 dark:text-blue-400 font-medium">
+            <span>🔗</span>
+            <span className="truncate font-mono">/content/{data.contentSlug}</span>
+          </div>
         )}
       </div>
 
-      {/* Handle dưới (output) - kéo từ đây để tạo edge mới */}
+      {/* ── Bottom handle (outgoing connection) ── */}
       <Handle
         type="source"
         position={Position.Bottom}
-        className="!w-3 !h-3 !bg-primary !border-2 !border-background"
+        className="!w-3 !h-3 !bg-primary !border-2 !border-background hover:!bg-primary/80 transition-colors"
       />
     </>
   );
 });
 
 CustomRoadmapNode.displayName = "CustomRoadmapNode";
-
 export default CustomRoadmapNode;

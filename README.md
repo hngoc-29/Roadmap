@@ -90,8 +90,11 @@ src/
 │   │           └── loading.tsx
 │   │
 │   ├── content/
-│   │   ├── page.tsx            # Thư viện nội dung
+│   │   ├── page.tsx            # Thư viện nội dung (+ nút "Thêm mới")
 │   │   ├── loading.tsx
+│   │   ├── error.tsx           # ✅ Error boundary
+│   │   ├── new/
+│   │   │   └── page.tsx        # ✅ Form tạo Content mới
 │   │   └── [content-slug]/
 │   │       ├── page.tsx        # ✅ Trang content chi tiết
 │   │       └── loading.tsx
@@ -115,7 +118,8 @@ src/
 │   ├── NodeEditModal.tsx       # Modal chỉnh sửa Markdown (3 tabs)
 │   ├── JsonLd.tsx              # Structured Data (Schema.org)
 │   ├── CreateRoadmapForm.tsx   # ✅ Form tạo Roadmap mới
-│   └── CreatePostForm.tsx      # ✅ Form tạo Blog Post
+│   ├── CreatePostForm.tsx      # ✅ Form tạo Blog Post
+│   └── CreateContentForm.tsx   # ✅ Form tạo Content Library item
 │
 ├── lib/
 │   ├── mongodb.ts              # MongoDB singleton connection
@@ -279,13 +283,14 @@ Toggle publish: "Draft" ↔ "Public" không cần reload trang
 - [x] **Content Library** tái sử dụng giữa nhiều roadmap
 
 ### ✅ Phase 4: Polish & Deploy
-- [x] Loading skeletons (CLS optimization) — tất cả routes
+- [x] Loading skeletons (CLS optimization) — tất cả routes kể cả homepage
+- [x] **Error boundaries** — `error.tsx` cho global, roadmap, blog, content
 - [x] **Global NavBar** (sticky, highlight active route)
-- [x] **Error boundaries** (not-found.tsx)
-- [x] **ReactFlow canvas height** fixed (100vh - navbar)
-- [x] Mobile responsive
-- [ ] Google Search Console setup *(cần NEXT_PUBLIC_APP_URL production)*
-- [ ] Performance audit (Lighthouse ≥ 90)
+- [x] **ReactFlow canvas height** fixed (`calc(100vh - 3.5rem)`)
+- [x] Mobile responsive (Tailwind breakpoints: sm/md/lg)
+- [x] **Revalidate API** — xử lý cả `roadmap` / `blog` / `content` type
+- [ ] Google Search Console setup *(thêm verification code vào `layout.tsx`)*
+- [ ] Performance audit (Lighthouse ≥ 90) *(chạy sau khi deploy production)*
 
 ---
 
@@ -301,10 +306,20 @@ curl http://localhost:3000/sitemap.xml
 # Kiểm tra JSON-LD
 # DevTools → Sources → tìm <script type="application/ld+json">
 
-# On-demand revalidation
+# On-demand revalidation – Roadmap
 curl -X POST http://localhost:3000/api/revalidate \
   -H "Content-Type: application/json" \
-  -d '{"secret":"your-secret","slug":"frontend-web-development-2025"}'
+  -d '{"secret":"your-secret","type":"roadmap","slug":"frontend-web-development-2025"}'
+
+# On-demand revalidation – Blog post
+curl -X POST http://localhost:3000/api/revalidate \
+  -H "Content-Type: application/json" \
+  -d '{"secret":"your-secret","type":"blog","slug":"huong-dan-hoc-frontend-2025"}'
+
+# On-demand revalidation – Content
+curl -X POST http://localhost:3000/api/revalidate \
+  -H "Content-Type: application/json" \
+  -d '{"secret":"your-secret","type":"content","slug":"javascript-async-await"}'
 ```
 
 ---
