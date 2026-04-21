@@ -2,7 +2,6 @@
 // SCRIPTS/SEED.TS - Seed MongoDB với dữ liệu mẫu
 // ============================================================
 // Chạy: npx tsx scripts/seed.ts
-// Hoặc: npx ts-node scripts/seed.ts
 
 import mongoose from "mongoose";
 import dotenv from "dotenv";
@@ -10,26 +9,33 @@ import dotenv from "dotenv";
 dotenv.config({ path: ".env.local" });
 
 const MONGODB_URI = process.env.MONGODB_URI!;
-if (!MONGODB_URI) throw new Error("Missing MONGODB_URI");
+if (!MONGODB_URI) throw new Error("Missing MONGODB_URI in .env.local");
 
-// ── Schema nhỏ gọn cho seed script ──
 const RoadmapSchema = new mongoose.Schema({}, { strict: false });
-const Roadmap =
-  mongoose.models.Roadmap ?? mongoose.model("Roadmap", RoadmapSchema);
+const Roadmap = mongoose.models.Roadmap ?? mongoose.model("Roadmap", RoadmapSchema);
+
+const PostSchema = new mongoose.Schema({}, { strict: false });
+const Post = mongoose.models.Post ?? mongoose.model("Post", PostSchema);
+
+const ContentSchema = new mongoose.Schema({}, { strict: false });
+const Content = mongoose.models.Content ?? mongoose.model("Content", ContentSchema);
 
 async function seed() {
   await mongoose.connect(MONGODB_URI);
   console.log("✅ Connected to MongoDB");
 
-  // Xóa data cũ (development only)
-  await Roadmap.deleteMany({});
+  await Promise.all([
+    Roadmap.deleteMany({}),
+    Post.deleteMany({}),
+    Content.deleteMany({}),
+  ]);
   console.log("🗑️  Cleared old data");
 
+  // ── Seed Roadmap ──
   const roadmap = await Roadmap.create({
     title: "Lộ trình học Frontend Web Development 2025",
     slug: "frontend-web-development-2025",
-    description:
-      "Lộ trình học Frontend từ cơ bản đến nâng cao: HTML, CSS, JavaScript, React, Next.js và các công cụ hiện đại.",
+    description: "Lộ trình học Frontend từ cơ bản đến nâng cao: HTML, CSS, JavaScript, React, Next.js và các công cụ hiện đại.",
     author: { name: "Roadmap Builder Team", avatar: "" },
     category: "Frontend",
     tags: ["html", "css", "javascript", "react", "nextjs", "typescript"],
@@ -110,7 +116,7 @@ async function seed() {
           slug: "nextjs-va-typescript",
           icon: "🚀",
           description: "Full-stack React với Next.js, TypeScript, và deployment",
-          content: `# Next.js & TypeScript\n\nNext.js là React framework cho production.\n\n## App Router\n\n\`\`\`tsx\n// app/page.tsx\nexport default function HomePage() {\n  return <h1>Xin chào!</h1>;\n}\n\`\`\`\n\n## Server Component\n\n\`\`\`tsx\n// Chạy trên server, an toàn với database\nasync function getData() {\n  const data = await db.find();\n  return data;\n}\n\`\`\``,
+          content: `# Next.js & TypeScript\n\nNext.js là React framework cho production.\n\n## App Router\n\n\`\`\`tsx\n// app/page.tsx\nexport default function HomePage() {\n  return <h1>Xin chào!</h1>;\n}\n\`\`\`\n\n## Server Component\n\n\`\`\`tsx\nasync function getData() {\n  const data = await db.find();\n  return data;\n}\n\`\`\``,
           status: "locked",
           difficulty: "advanced",
           estimatedTime: "5 tuần",
@@ -127,14 +133,44 @@ async function seed() {
       { id: "e4-5", source: "node-4", target: "node-5", type: "smoothstep", animated: true },
     ],
   });
+  console.log(`✅ Roadmap: "${roadmap.title}" (${roadmap.nodes.length} nodes)`);
 
-  console.log(`✅ Created roadmap: "${roadmap.title}" (slug: ${roadmap.slug})`);
-  console.log(`   - ${roadmap.nodes.length} nodes`);
-  console.log(`   - ${roadmap.edges.length} edges`);
-  console.log(`\n🌐 Truy cập: ${process.env.NEXT_PUBLIC_APP_URL}w/roadmap/${roadmap.slug}`);
+  // ── Seed Blog Post ──
+  const post = await Post.create({
+    title: "Hướng dẫn học Frontend từ A đến Z năm 2025",
+    slug: "huong-dan-hoc-frontend-2025",
+    description: "Lộ trình học Frontend hoàn chỉnh từ HTML/CSS cơ bản đến React, Next.js và TypeScript. Phù hợp cho người mới bắt đầu.",
+    content: `# Hướng dẫn học Frontend từ A đến Z\n\nNăm 2025, Frontend development đã có nhiều thay đổi. Bài viết này sẽ hướng dẫn bạn từng bước từ cơ bản đến nâng cao.\n\n## 1. HTML & CSS Cơ bản\n\nBắt đầu với HTML và CSS. Đây là nền tảng không thể bỏ qua.\n\n\`\`\`html\n<!DOCTYPE html>\n<html lang="vi">\n<head>\n  <title>My Page</title>\n</head>\n<body>\n  <h1>Hello World</h1>\n</body>\n</html>\n\`\`\`\n\n## 2. JavaScript ES6+\n\nHọc JavaScript hiện đại với arrow functions, destructuring, modules.\n\n## 3. React.js\n\nReact là thư viện phổ biến nhất hiện nay cho việc xây dựng UI.\n\n## 4. Next.js\n\nNext.js giúp bạn build production-ready apps với SSR, SSG và API routes.\n\n## Kết luận\n\nHãy học từng bước và thực hành nhiều. Chúc bạn thành công!`,
+    author: { name: "Roadmap Builder Team" },
+    category: "Guide",
+    tags: ["frontend", "html", "css", "javascript", "react", "nextjs"],
+    relatedRoadmaps: ["frontend-web-development-2025"],
+    isPublished: true,
+    publishedAt: new Date(),
+    viewCount: 342,
+  });
+  console.log(`✅ Blog Post: "${post.title}"`);
+
+  // ── Seed Content ──
+  const content = await Content.create({
+    title: "JavaScript Async/Await toàn tập",
+    slug: "javascript-async-await",
+    description: "Hiểu sâu về async/await trong JavaScript: từ callback, Promise đến async/await hiện đại.",
+    content: `# JavaScript Async/Await\n\n## Callback Hell\n\nTrước khi có Promise, chúng ta phải dùng callback:\n\n\`\`\`javascript\ngetUser(id, (user) => {\n  getPosts(user.id, (posts) => {\n    getComments(posts[0].id, (comments) => {\n      console.log(comments);\n    });\n  });\n});\n\`\`\`\n\n## Promise\n\n\`\`\`javascript\ngetUser(id)\n  .then(user => getPosts(user.id))\n  .then(posts => getComments(posts[0].id))\n  .then(comments => console.log(comments))\n  .catch(err => console.error(err));\n\`\`\`\n\n## Async/Await\n\n\`\`\`javascript\nasync function loadData(id) {\n  try {\n    const user = await getUser(id);\n    const posts = await getPosts(user.id);\n    const comments = await getComments(posts[0].id);\n    return comments;\n  } catch (err) {\n    console.error(err);\n  }\n}\n\`\`\``,
+    icon: "⚡",
+    difficulty: "intermediate",
+    estimatedTime: "2 giờ",
+    tags: ["javascript", "async", "promise", "es6"],
+  });
+  console.log(`✅ Content: "${content.title}"`);
+
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  console.log(`\n🌐 Roadmap: ${appUrl}/roadmap/${roadmap.slug}`);
+  console.log(`📝 Blog:    ${appUrl}/blog/${post.slug}`);
+  console.log(`📚 Content: ${appUrl}/content/${content.slug}`);
 
   await mongoose.disconnect();
-  console.log("👋 Disconnected from MongoDB");
+  console.log("\n👋 Done!");
   process.exit(0);
 }
 

@@ -1,38 +1,33 @@
 // ============================================================
 // APP/ROADMAP/[ROADMAP-SLUG]/PAGE.TSX
 // ============================================================
-// ✅ Server Component với generateMetadata động
-// ✅ generateStaticParams cho Static Site Generation (SSG)
-// ✅ ISR: Tự động rebuild khi content thay đổi
+// ✅ FIX 1: force-dynamic → không cache, data luôn mới
+// ✅ FIX 2: getRoadmapBySlug bỏ isPublished → draft không 404
+// ✅ FIX 3: Đọc ?mode=edit từ URL → mở edit mode ngay sau khi tạo
 
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { getRoadmapBySlug, getAllRoadmapSlugs, incrementViewCount } from "@/actions/roadmap";
+import {
+  getRoadmapBySlug,
+  getAllRoadmapSlugs,
+  incrementViewCount,
+} from "@/actions/roadmap";
 import { getCanonicalUrl, extractExcerpt } from "@/lib/utils";
 import { CourseJsonLd } from "@/components/JsonLd";
 import RoadmapBuilder from "@/components/RoadmapBuilder";
-import type { IRoadmap } from "@/types";
+import type { IRoadmap, AppMode } from "@/types";
 
-// ──────────────────────────────────────────────
-// CACHE STRATEGY
-// ──────────────────────────────────────────────
-// Trang roadmap ít thay đổi → cache lâu, revalidate theo ISR
-export const revalidate = 3600; // 1 giờ
+export const dynamic = "force-dynamic";
 
-// ──────────────────────────────────────────────
-// GENERATE STATIC PARAMS - Pre-render lúc build time
-// ✅ Tất cả roadmaps published sẽ được generate thành HTML tĩnh
-// ✅ Khi user truy cập → serve từ CDN (cực nhanh, LCP tốt)
-// ──────────────────────────────────────────────
 export async function generateStaticParams() {
-  const roadmaps = await getAllRoadmapSlugs();
-  return roadmaps.map((r) => ({ "roadmap-slug": r.slug }));
+  try {
+    const roadmaps = await getAllRoadmapSlugs();
+    return roadmaps.map((r) => ({ "roadmap-slug": r.slug }));
+  } catch {
+    return [];
+  }
 }
 
-// ──────────────────────────────────────────────
-// GENERATE METADATA - SEO động theo từng roadmap
-// ✅ Next.js tự động inject vào <head> mà không cần client JS
-// ──────────────────────────────────────────────
 export async function generateMetadata({
   params,
 }: {
@@ -40,99 +35,77 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { "roadmap-slug": slug } = await params;
   const roadmap = await getRoadmapBySlug(slug);
-
-  // Nếu không tìm thấy → trả về metadata mặc định (không 404 ở đây)
-  if (!roadmap) {
-    return {
-      title: "Roadmap không tồn tại",
-      description: "Roadmap bạn tìm kiếm không tồn tại hoặc đã bị xóa.",
-      robots: { index: false }, // Không index trang 404
-    };
-  }
+  if (!roadmap)
+    return { title: "Roadmap không tồn tại", robots: { index: false } };
 
   const url = getCanonicalUrl("roadmap", roadmap.slug);
   const description = extractExcerpt(roadmap.description, 160);
-
   return {
     title: roadmap.title,
     description,
     keywords: roadmap.tags,
-
-    // ✅ Canonical URL: Tránh duplicate content
-    alternates: {
-      canonical: url,
-    },
-
-    // ✅ OpenGraph: Hiển thị đẹp khi share lên mạng xã hội
+    alternates: { canonical: url },
     openGraph: {
       type: "website",
       url,
       title: roadmap.title,
       description,
       images: roadmap.coverImage
-        ? [
-            {
-              url: roadmap.coverImage,
-              width: 1200,
-              height: 630,
-              alt: roadmap.title,
-            },
-          ]
+        ? [{ url: roadmap.coverImage, width: 1200, height: 630, alt: roadmap.title }]
         : [{ url: "/og-default.png", width: 1200, height: 630 }],
       siteName: process.env.NEXT_PUBLIC_APP_NAME,
       locale: "vi_VN",
     },
-
-    // ✅ Twitter Card
     twitter: {
       card: "summary_large_image",
       title: roadmap.title,
       description,
-      images: roadmap.coverImage ? [roadmap.coverImage] : ["/og-default.png"],
     },
-
-    // ✅ Article-specific metadata
-    other: {
-      "article:author": roadmap.author.name,
-      "article:tag": roadmap.tags?.join(", ") ?? "",
-    },
+    robots: roadmap.isPublished
+      ? { index: true, follow: true }
+      : { index: false },
   };
 }
 
-// ──────────────────────────────────────────────
-// PAGE COMPONENT
-// ──────────────────────────────────────────────
 export default async function RoadmapPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ "roadmap-slug": string }>;
+  // ✅ FIX: Đọc ?mode=edit từ URL
+  searchParams: Promise<{ mode?: string }>;
 }) {
   const { "roadmap-slug": slug } = await params;
+  const { mode: modeParam } = await searchParams;
 
-  // Fetch data (được cache bởi Next.js fetch cache hoặc ISR)
   const roadmap = await getRoadmapBySlug(slug);
+  if (!roadmap) notFound();
 
-  if (!roadmap) {
-    notFound(); // → 404 page
-  }
+  // ✅ FIX: Nếu URL có ?mode=edit → mở edit mode ngay
+  // Dùng khi CreateRoadmapForm redirect sau khi tạo thành công
+  const initialMode: AppMode = modeParam === "edit" ? "edit" : "view";
 
-  // Tăng view count (không await để không block rendering)
-  // Fire-and-forget pattern: không cần chờ DB update xong
-  void incrementViewCount(slug);
+  if (roadmap.isPublished) void incrementViewCount(slug);
 
   return (
     <>
-      {/* ✅ JSON-LD được render trong <head> bởi Next.js */}
-      <CourseJsonLd roadmap={roadmap as IRoadmap} />
+      {roadmap.isPublished && <CourseJsonLd roadmap={roadmap as IRoadmap} />}
 
-      {/* 
-        ✅ QUAN TRỌNG: RoadmapBuilder là Client Component
-        Nhưng data được fetch ở Server → truyền xuống qua props
-        Pattern: Server fetches → Client renders interactive UI
-      */}
+      {/* Banner Draft */}
+      {!roadmap.isPublished && (
+        <div className="w-full bg-yellow-50 dark:bg-yellow-900/20 border-b border-yellow-200 dark:border-yellow-800 px-4 py-2.5 flex items-center justify-center gap-2 text-sm text-yellow-800 dark:text-yellow-300">
+          <span>📝</span>
+          <span className="font-medium">Chế độ Draft</span>
+          <span className="text-yellow-600 dark:text-yellow-400 ml-1">
+            — Roadmap này chưa được xuất bản. Chuyển sang Edit mode để thêm nội dung và Publish.
+          </span>
+        </div>
+      )}
+
+      {/* ✅ Truyền initialMode từ URL param vào Builder */}
       <RoadmapBuilder
         roadmap={roadmap as IRoadmap}
-        mode="view" // Mặc định là chế độ xem
+        mode={initialMode}
       />
     </>
   );

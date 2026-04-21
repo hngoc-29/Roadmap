@@ -10,10 +10,10 @@ import type { Node as RFNode, Edge as RFEdge } from "reactflow";
 export interface RoadmapNodeData {
   label: string;
   slug: string;
-  // ✅ MỚI: contentSlug → link tới Content collection (/content/[slug])
-  // Nếu có contentSlug, node navigate tới /content/[contentSlug]
-  // Nếu không, fallback về inline /roadmap/[roadmap]/[node]
+  // contentSlug → link tới Content collection (/content/[slug])
   contentSlug?: string;
+  // postSlug → link tới Blog Post (/blog/[slug])
+  postSlug?: string;
   content: string;
   description?: string;
   status?: "locked" | "available" | "active" | "completed";
@@ -127,4 +127,31 @@ export interface RoadmapBuilderProps {
   roadmap: IRoadmap;
   mode: AppMode;
   onSave?: (updatedRoadmap: IRoadmap) => Promise<void>;
+}
+
+// ──────────────────────────────────────────────
+// 9. BLOG POST DOCUMENT (MongoDB)
+// ──────────────────────────────────────────────
+export interface IPost {
+  _id?: string;
+  id?: string;
+  title: string;
+  slug: string;
+  content: string;
+  description?: string;
+  coverImage?: string;
+  author: { name: string; avatar?: string };
+  category?: string;
+  tags?: string[];
+  relatedRoadmaps?: string[];
+  resources?: Array<{
+    title: string;
+    url: string;
+    type: "article" | "video" | "course" | "book";
+  }>;
+  isPublished: boolean;
+  publishedAt?: Date | string;
+  viewCount?: number;
+  createdAt?: Date | string;
+  updatedAt?: Date | string;
 }

@@ -96,7 +96,7 @@ export async function getLinkedRoadmaps(
 
   const roadmaps = await Roadmap.find(
     {
-      isPublished: true,
+      // ✅ FIX: Bỏ isPublished filter
       "nodes.data.contentSlug": contentSlug,
     },
     { title: 1, slug: 1, "nodes.data.label": 1, "nodes.data.contentSlug": 1 }

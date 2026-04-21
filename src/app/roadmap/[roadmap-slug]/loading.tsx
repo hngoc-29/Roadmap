@@ -1,5 +1,5 @@
 // ============================================================
-// APP/ROADMAP/[ROADMAP-SLUG]/LOADING.TSX
+// APP/ROADMAP/[ROADMAP-SLUG]/LOADING.TSX - Updated
 // ============================================================
 // ✅ Next.js Suspense-based loading skeleton
 // ✅ Ngăn chặn layout shift (CLS) bằng placeholder cùng kích thước
