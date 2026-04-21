@@ -9,6 +9,7 @@
 
 import { useState, useCallback, useRef, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import ReactFlow, {
   Background,
   Controls,
@@ -25,10 +26,12 @@ import "reactflow/dist/style.css";
 import { nanoid } from "nanoid";
 
 import type { IRoadmap, RoadmapNodeData, AppMode } from "@/types";
+import type { Edge } from "reactflow";
 import { saveRoadmapGraph, togglePublishRoadmap } from "@/actions/roadmap";
 import { createSlug } from "@/lib/utils";
 import NodeEditModal from "./NodeEditModal";
 import CustomRoadmapNode from "./CustomRoadmapNode";
+import ShareModal from "./ShareModal";
 
 const nodeTypes = { roadmapNode: CustomRoadmapNode };
 
@@ -42,9 +45,21 @@ export default function RoadmapBuilder({
   mode: initialMode = "view",
 }: RoadmapBuilderProps) {
   const router = useRouter();
+  const { data: session } = useSession();
   const [mode, setMode] = useState<AppMode>(initialMode);
   const [isPublished, setIsPublished] = useState(roadmap.isPublished);
   const [publishPending, startPublishTransition] = useTransition();
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [roadmapState, setRoadmapState] = useState(roadmap);
+
+  // Kiểm tra quyền edit: owner, collaborator, hoặc allowPublicEdit
+  const userEmail = session?.user?.email ?? "";
+  const userId = (session?.user as { id?: string } | null | undefined)?.id ?? "";
+  const canEdit =
+    roadmapState.allowPublicEdit ||
+    (!!userId && roadmapState.ownerId === userId) ||
+    (!!userEmail && roadmapState.ownerEmail === userEmail) ||
+    (!!userEmail && (roadmapState.collaborators ?? []).includes(userEmail));
 
   const [nodes, setNodes, onNodesChange] = useNodesState(
     roadmap.nodes.map((n) => ({
@@ -185,7 +200,7 @@ export default function RoadmapBuilder({
   );
 
   const handleEdgesChangeFromModal = useCallback(
-    (newEdges: typeof edges) => {
+    (newEdges: Edge[]) => {
       setEdges(newEdges);
     },
     [setEdges]
@@ -218,17 +233,19 @@ export default function RoadmapBuilder({
           {/* ── Divider ── */}
           <div className="w-px h-5 bg-border mx-1 hidden sm:block" />
 
-          {/* ── Mode toggle ── */}
-          <button
-            onClick={() => setMode(mode === "view" ? "edit" : "view")}
-            className={`text-xs font-medium px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap ${
-              mode === "edit"
-                ? "bg-primary text-primary-foreground"
-                : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
-            }`}
-          >
-            {mode === "view" ? "✏️ Chỉnh sửa" : "👁️ Xem"}
-          </button>
+          {/* ── Mode toggle (chỉ hiện khi có quyền edit) ── */}
+          {canEdit && (
+            <button
+              onClick={() => setMode(mode === "view" ? "edit" : "view")}
+              className={`text-xs font-medium px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap ${
+                mode === "edit"
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
+              }`}
+            >
+              {mode === "view" ? "✏️ Chỉnh sửa" : "👁️ Xem"}
+            </button>
+          )}
 
           {/* ── Edit-mode buttons ── */}
           {mode === "edit" && (
@@ -265,6 +282,14 @@ export default function RoadmapBuilder({
               </button>
             </>
           )}
+
+          {/* ── Share button ── */}
+          <button
+            onClick={() => setShowShareModal(true)}
+            className="text-xs font-medium px-3 py-1.5 rounded-lg bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors whitespace-nowrap"
+          >
+            🔗 Chia sẻ
+          </button>
 
           {/* ── Status badge (luôn hiển thị) ── */}
           <span
@@ -369,6 +394,17 @@ export default function RoadmapBuilder({
           allNodes={allNodesForModal}
           currentEdges={edges}
           onEdgesChange={handleEdgesChangeFromModal}
+        />
+      )}
+
+      {/* Modal chia sẻ */}
+      {showShareModal && (
+        <ShareModal
+          roadmap={roadmapState}
+          onClose={() => setShowShareModal(false)}
+          onUpdated={(updated) => {
+            setRoadmapState((prev) => ({ ...prev, ...updated }));
+          }}
         />
       )}
     </div>

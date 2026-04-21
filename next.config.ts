@@ -1,14 +1,6 @@
 import type { NextConfig } from "next";
 
-const appUrl      = process.env.NEXT_PUBLIC_APP_URL || "";
-const appHostname = appUrl.replace(/^https?:\/\//, "").split(":")[0];
-
 const nextConfig: NextConfig = {
-  // ✅ Treat ESLint warnings as warnings, never block build
-  eslint: {
-    ignoreDuringBuilds: false,
-  },
-
   images: {
     formats: ["image/avif", "image/webp"],
     remotePatterns: [{ protocol: "https", hostname: "**" }],
@@ -16,17 +8,15 @@ const nextConfig: NextConfig = {
 
   compress: true,
 
+  // ✅ Next 16: mongoose chạy server-side only
+  serverExternalPackages: ["mongoose"],
+
   experimental: {
     optimizePackageImports: [
       "lucide-react",
       "reactflow",
       "@radix-ui/react-dialog",
     ],
-    serverActions: {
-      allowedOrigins: appHostname
-        ? [appHostname, "localhost:3000"]
-        : ["localhost:3000"],
-    },
   },
 
   async headers() {

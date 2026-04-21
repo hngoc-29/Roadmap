@@ -7,7 +7,7 @@
 // Dùng khi publish nội dung mới để rebuild pages ngay lập tức
 
 import { NextRequest, NextResponse } from "next/server";
-import { revalidatePath, revalidateTag } from "next/cache";
+import { revalidatePath } from "next/cache";
 
 type RevalidateType = "roadmap" | "blog" | "content";
 
@@ -45,18 +45,18 @@ export async function POST(request: NextRequest) {
       }
 
       revalidatePath("/");
-      revalidateTag("roadmaps");
+  // revalidateTag("roadmaps"); // ✅ Removed: not needed with force-dynamic
       revalidated.push("/", "tag:roadmaps");
     } else if (type === "blog") {
       revalidatePath(`/blog/${slug}`);
       revalidatePath("/blog");
       revalidatePath("/");
-      revalidateTag("posts");
+  // revalidateTag("posts"); // ✅ Removed: not needed with force-dynamic
       revalidated.push(`/blog/${slug}`, "/blog", "/", "tag:posts");
     } else if (type === "content") {
       revalidatePath(`/content/${slug}`);
       revalidatePath("/content");
-      revalidateTag("contents");
+  // revalidateTag("contents"); // ✅ Removed: not needed with force-dynamic
       revalidated.push(`/content/${slug}`, "/content", "tag:contents");
     }
 

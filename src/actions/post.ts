@@ -4,7 +4,7 @@
 
 "use server";
 
-import { revalidatePath, revalidateTag } from "next/cache";
+import { revalidatePath } from "next/cache";
 import { connectDB } from "@/lib/mongodb";
 import Post from "@/models/Post";
 import { serializeDoc, createSlug } from "@/lib/utils";
@@ -118,7 +118,7 @@ export async function createPost(data: {
     viewCount: 0,
   });
 
-  revalidateTag("posts");
+  // revalidateTag("posts"); // ✅ Removed: not needed with force-dynamic
   revalidatePath("/blog");
   return serializeDoc(doc.toJSON()) as unknown as IPost;
 }
@@ -156,7 +156,7 @@ export async function updatePost(
   const updated = doc as unknown as { slug: string };
   revalidatePath(`/blog/${updated.slug}`);
   revalidatePath("/blog");
-  revalidateTag("posts");
+  // revalidateTag("posts"); // ✅ Removed: not needed with force-dynamic
 
   return { success: true };
 }
@@ -170,7 +170,7 @@ export async function deletePost(id: string): Promise<{ success: boolean }> {
   if (!doc) throw new Error("Không tìm thấy bài viết");
 
   revalidatePath("/blog");
-  revalidateTag("posts");
+  // revalidateTag("posts"); // ✅ Removed: not needed with force-dynamic
   return { success: true };
 }
 

@@ -9,7 +9,7 @@
 "use client";
 
 import { useState, useCallback, useTransition, useEffect, useRef } from "react";
-import { Edge } from 'reactflow';
+import type { Edge } from 'reactflow';
 import * as Dialog from "@radix-ui/react-dialog";
 import { updateNodeContent } from "@/actions/roadmap";
 import { createContent, searchContent } from "@/actions/content";

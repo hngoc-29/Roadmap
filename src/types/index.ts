@@ -4,15 +4,9 @@
 
 import type { Node as RFNode, Edge as RFEdge } from "reactflow";
 
-// ──────────────────────────────────────────────
-// 1. ROADMAP NODE DATA
-// ──────────────────────────────────────────────
 export interface RoadmapNodeData {
   label: string;
   slug: string;
-  // ✅ MỚI: contentSlug → link tới Content collection (/content/[slug])
-  // Nếu có contentSlug, node navigate tới /content/[contentSlug]
-  // Nếu không, fallback về inline /roadmap/[roadmap]/[node]
   contentSlug?: string;
   content: string;
   description?: string;
@@ -29,21 +23,21 @@ export interface RoadmapNodeData {
   }>;
 }
 
-// ──────────────────────────────────────────────
-// 2. REACT FLOW NODE & EDGE TYPES
-// ──────────────────────────────────────────────
 export type RoadmapNode = RFNode<RoadmapNodeData>;
 export type RoadmapEdge = RFEdge;
 
-// ──────────────────────────────────────────────
-// 3. ROADMAP DOCUMENT (MongoDB)
-// ──────────────────────────────────────────────
 export interface IRoadmap {
   _id?: string;
   title: string;
   slug: string;
   description: string;
   author: { name: string; avatar?: string };
+  // Auth / Collaboration
+  ownerId?: string;
+  ownerEmail?: string;
+  collaborators?: string[];
+  allowPublicEdit?: boolean;
+  // Other
   category?: string;
   tags?: string[];
   coverImage?: string;
@@ -68,9 +62,6 @@ export interface IRoadmap {
   updatedAt?: Date;
 }
 
-// ──────────────────────────────────────────────
-// 4. CONTENT DOCUMENT (MongoDB) – độc lập
-// ──────────────────────────────────────────────
 export interface IContent {
   _id?: string;
   id?: string;
@@ -91,14 +82,8 @@ export interface IContent {
   updatedAt?: Date | string;
 }
 
-// ──────────────────────────────────────────────
-// 5. APP MODE
-// ──────────────────────────────────────────────
 export type AppMode = "view" | "edit";
 
-// ──────────────────────────────────────────────
-// 6. API RESPONSE TYPES
-// ──────────────────────────────────────────────
 export interface ApiResponse<T> {
   success: boolean;
   data?: T;
@@ -106,9 +91,6 @@ export interface ApiResponse<T> {
   message?: string;
 }
 
-// ──────────────────────────────────────────────
-// 7. SEO METADATA HELPERS
-// ──────────────────────────────────────────────
 export interface PageSeoProps {
   title: string;
   description: string;
@@ -120,18 +102,12 @@ export interface PageSeoProps {
   type?: "website" | "article";
 }
 
-// ──────────────────────────────────────────────
-// 8. ROADMAP BUILDER PROPS
-// ──────────────────────────────────────────────
 export interface RoadmapBuilderProps {
   roadmap: IRoadmap;
   mode: AppMode;
   onSave?: (updatedRoadmap: IRoadmap) => Promise<void>;
 }
 
-// ──────────────────────────────────────────────
-// 9. BLOG POST DOCUMENT (MongoDB)
-// ──────────────────────────────────────────────
 export interface IPost {
   _id?: string;
   id?: string;
@@ -143,7 +119,7 @@ export interface IPost {
   author: { name: string; avatar?: string };
   category?: string;
   tags?: string[];
-  relatedRoadmaps?: string[]; // slugs của roadmap liên quan
+  relatedRoadmaps?: string[];
   resources?: Array<{
     title: string;
     url: string;

@@ -6,6 +6,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { createRoadmap } from "@/actions/roadmap";
 
 const CATEGORIES = [
@@ -15,12 +16,14 @@ const CATEGORIES = [
 
 export default function CreateRoadmapForm() {
   const router = useRouter();
+  const { data: session } = useSession();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState("");
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [authorName, setAuthorName] = useState("");
+  // Tự động lấy tên từ session
+  const [authorName, setAuthorName] = useState(session?.user?.name ?? "");
   const [category, setCategory] = useState("");
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -38,11 +41,9 @@ export default function CreateRoadmapForm() {
           authorName: authorName.trim(),
           category: category || undefined,
         });
-        // Redirect tới editor ngay sau khi tạo
-        // ✅ FIX: ?mode=edit → mở ngay chế độ chỉnh sửa sau khi tạo
         router.push(`/roadmap/${roadmap.slug}?mode=edit`);
       } catch (err) {
-        setError("Có lỗi xảy ra. Vui lòng thử lại.");
+        setError(err instanceof Error ? err.message : "Có lỗi xảy ra. Vui lòng thử lại.");
         console.error(err);
       }
     });
@@ -76,7 +77,7 @@ export default function CreateRoadmapForm() {
       <div>
         <label className="block text-sm font-medium mb-1.5">
           Mô tả <span className="text-destructive">*</span>
-          <span className="text-muted-foreground font-normal ml-1">(dùng cho SEO meta description)</span>
+          <span className="text-muted-foreground font-normal ml-1">(dùng cho SEO)</span>
         </label>
         <textarea
           value={description}
@@ -102,11 +103,14 @@ export default function CreateRoadmapForm() {
             placeholder="Tên của bạn"
             className="w-full border border-input bg-background rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
           />
+          {session?.user?.name && authorName === session.user.name && (
+            <p className="text-xs text-muted-foreground mt-1">
+              ✓ Lấy từ GitHub
+            </p>
+          )}
         </div>
         <div>
-          <label className="block text-sm font-medium mb-1.5">
-            Danh mục
-          </label>
+          <label className="block text-sm font-medium mb-1.5">Danh mục</label>
           <select
             value={category}
             onChange={(e) => setCategory(e.target.value)}
@@ -127,10 +131,10 @@ export default function CreateRoadmapForm() {
           <li>Roadmap sẽ ở chế độ <strong>Draft</strong> (chưa publish)</li>
           <li>Bạn được chuyển thẳng vào <strong>editor</strong> để thêm nodes</li>
           <li>Nhấn <strong>Xuất bản</strong> khi muốn public cho mọi người xem</li>
+          <li>Có thể <strong>chia sẻ</strong> cho người khác cùng edit</li>
         </ul>
       </div>
 
-      {/* Submit */}
       <button
         type="submit"
         disabled={isPending}

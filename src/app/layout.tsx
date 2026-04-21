@@ -1,10 +1,12 @@
 // ============================================================
-// APP/LAYOUT.TSX - Root Layout với SEO Metadata & NavBar
+// APP/LAYOUT.TSX - Root Layout với SEO Metadata, NavBar & Auth
 // ============================================================
-// ✅ Dùng local font (không phụ thuộc network khi build)
 
 import type { Metadata, Viewport } from "next";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 import NavBar from "@/components/NavBar";
+import SessionProvider from "@/components/SessionProvider";
 import "./globals.css";
 
 export const viewport: Viewport = {
@@ -64,22 +66,26 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
+  const session = await getServerSession(authOptions);
+
   return (
     <html lang="vi" suppressHydrationWarning>
       <body className="antialiased min-h-screen bg-background font-sans">
-        <a
-          href="#main-content"
-          className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-50
-                     focus:px-4 focus:py-2 focus:bg-primary focus:text-primary-foreground
-                     focus:rounded-md focus:outline-none"
-        >
-          Bỏ qua đến nội dung chính
-        </a>
-        <NavBar />
-        <main id="main-content">{children}</main>
+        <SessionProvider session={session}>
+          <a
+            href="#main-content"
+            className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-50
+                       focus:px-4 focus:py-2 focus:bg-primary focus:text-primary-foreground
+                       focus:rounded-md focus:outline-none"
+          >
+            Bỏ qua đến nội dung chính
+          </a>
+          <NavBar />
+          <main id="main-content">{children}</main>
+        </SessionProvider>
       </body>
     </html>
   );

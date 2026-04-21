@@ -43,7 +43,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
     // 3. Node Lesson Pages (FlatMap từ roadmaps)
     const nodeLessonPages: MetadataRoute.Sitemap = roadmaps.flatMap((r) =>
-      r.nodes.map((node: any) => ({
+      r.nodes.map((node: { data: { slug: string } }) => ({
         url: `${appUrl}/roadmap/${r.slug}/${node.data.slug}`,
         lastModified: safeDate(r.updatedAt),
         changeFrequency: "monthly" as const,

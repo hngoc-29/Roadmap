@@ -8,7 +8,7 @@
 
 "use server";
 
-import { revalidatePath, revalidateTag } from "next/cache";
+import { revalidatePath } from "next/cache";
 import { connectDB } from "@/lib/mongodb";
 import Content from "@/models/Content";
 import Roadmap from "@/models/Roadmap";
@@ -153,7 +153,7 @@ export async function createContent(data: {
     tags: data.tags ?? [],
   });
 
-  revalidateTag("contents");
+  // revalidateTag("contents"); // ✅ Removed: not needed with force-dynamic
   revalidatePath("/content");
   return serializeDoc(doc.toJSON()) as unknown as IContent;
 }
