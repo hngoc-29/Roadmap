@@ -4,9 +4,9 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useTransition, useState } from "react";
+import { useTransition, useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
-import { deleteContent } from "@/actions/content";
+import { deleteContent, checkContentEditPermission } from "@/actions/content";
 
 interface ContentCardActionsProps {
   contentId: string;
@@ -18,8 +18,14 @@ export default function ContentCardActions({ contentId, contentSlug }: ContentCa
   const { data: session, status } = useSession();
   const [isPending, startTransition] = useTransition();
   const [confirming, setConfirming] = useState(false);
+  const [canEdit, setCanEdit] = useState(false);
 
-  if (status === "loading" || !session) return null;
+  useEffect(() => {
+    if (!session) return;
+    checkContentEditPermission(contentId).then(({ canEdit }) => setCanEdit(canEdit));
+  }, [session, contentId]);
+
+  if (status === "loading" || !session || !canEdit) return null;
 
   const handleDelete = () => {
     if (!confirming) { setConfirming(true); return; }

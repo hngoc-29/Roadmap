@@ -1,10 +1,6 @@
 // ============================================================
 // ACTIONS/CONTENT.TS - Server Actions cho Content collection
 // ============================================================
-// Content tách biệt với Roadmap để:
-// - Nhiều roadmap link tới cùng 1 content
-// - URL /content/[slug] ngắn gọn, dễ chia sẻ
-// - Quản lý tập trung, không duplicate
 
 "use server";
 
@@ -18,13 +14,32 @@ import { serializeDoc, createSlug } from "@/lib/utils";
 import type { IContent } from "@/types";
 import { customAlphabet } from "nanoid";
 
-// ✅ FIX: Chỉ dùng ký tự lowercase alphanumeric để slug luôn pass regex
 const nanoidSafe = customAlphabet("abcdefghijklmnopqrstuvwxyz0123456789", 6);
 
 async function requireAuth() {
   const session = await getServerSession(authOptions);
   if (!session) throw new Error("Unauthorized: Bạn cần đăng nhập để thực hiện thao tác này");
   return session;
+}
+
+// Helper: kiểm tra quyền edit/delete content (chỉ owner)
+async function canEditContent(contentId: string) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user) return false;
+
+  const content = await Content.findById(contentId, { ownerId: 1, ownerEmail: 1 }).lean() as {
+    ownerId?: string; ownerEmail?: string;
+  } | null;
+
+  if (!content) return false;
+  // Content cũ chưa có owner → cho phép edit (backward compat)
+  if (!content.ownerId && !content.ownerEmail) return true;
+
+  const userId = (session.user as { id?: string }).id;
+  const userEmail = session.user.email ?? "";
+  if (content.ownerId && content.ownerId === userId) return true;
+  if (content.ownerEmail && content.ownerEmail === userEmail) return true;
+  return false;
 }
 
 // ──────────────────────────────────────────────
@@ -49,7 +64,6 @@ export async function searchContent(query: string): Promise<IContent[]> {
 
   const trimmed = query.trim();
   if (!trimmed) {
-    // Trả về 10 content mới nhất khi không có query
     const results = await Content.find(
       {},
       { title: 1, slug: 1, description: 1, icon: 1, difficulty: 1, estimatedTime: 1 }
@@ -60,7 +74,6 @@ export async function searchContent(query: string): Promise<IContent[]> {
     return serializeDoc(results) as unknown as IContent[];
   }
 
-  // Full-text search (dùng index đã tạo)
   const results = await Content.find(
     { $text: { $search: trimmed } },
     {
@@ -72,7 +85,6 @@ export async function searchContent(query: string): Promise<IContent[]> {
     .limit(15)
     .lean();
 
-  // Fallback: regex search nếu text search không có kết quả
   if (results.length === 0) {
     const regex = new RegExp(trimmed, "i");
     const fallback = await Content.find(
@@ -106,10 +118,7 @@ export async function getLinkedRoadmaps(
   await connectDB();
 
   const roadmaps = await Roadmap.find(
-    {
-      // ✅ FIX: Bỏ isPublished filter
-      "nodes.data.contentSlug": contentSlug,
-    },
+    { "nodes.data.contentSlug": contentSlug },
     { title: 1, slug: 1, "nodes.data.label": 1, "nodes.data.contentSlug": 1 }
   ).lean();
 
@@ -121,15 +130,9 @@ export async function getLinkedRoadmaps(
 
   const results: Array<{ title: string; slug: string; nodeLabel: string }> = [];
   for (const r of roadmaps as unknown as RoadmapResult[]) {
-    const matchingNodes = r.nodes.filter(
-      (n) => n.data?.contentSlug === contentSlug
-    );
+    const matchingNodes = r.nodes.filter((n) => n.data?.contentSlug === contentSlug);
     for (const node of matchingNodes) {
-      results.push({
-        title: r.title,
-        slug: r.slug,
-        nodeLabel: node.data.label,
-      });
+      results.push({ title: r.title, slug: r.slug, nodeLabel: node.data.label });
     }
   }
   return results;
@@ -148,7 +151,10 @@ export async function createContent(data: {
   tags?: string[];
 }) {
   await connectDB();
-  await requireAuth();
+  const session = await requireAuth();
+
+  const userId = (session.user as { id?: string } | undefined)?.id;
+  const userEmail = session.user?.email ?? "";
 
   const baseSlug = createSlug(data.title) || nanoidSafe();
   const existing = await Content.findOne({ slug: baseSlug });
@@ -163,9 +169,10 @@ export async function createContent(data: {
     difficulty: data.difficulty,
     estimatedTime: data.estimatedTime,
     tags: data.tags ?? [],
+    ownerId: userId,
+    ownerEmail: userEmail,
   });
 
-  // revalidateTag("contents"); // ✅ Removed: not needed with force-dynamic
   revalidatePath("/content");
   return serializeDoc(doc.toJSON()) as unknown as IContent;
 }
@@ -178,7 +185,9 @@ export async function updateContent(
   data: Partial<Omit<IContent, "_id" | "id" | "createdAt" | "updatedAt">>
 ) {
   await connectDB();
-  await requireAuth();
+
+  const hasPermission = await canEditContent(id);
+  if (!hasPermission) throw new Error("Bạn không có quyền chỉnh sửa nội dung này");
 
   const doc = await Content.findByIdAndUpdate(
     id,
@@ -195,6 +204,23 @@ export async function updateContent(
 }
 
 // ──────────────────────────────────────────────
+// DELETE: Xóa content
+// ──────────────────────────────────────────────
+export async function deleteContent(id: string): Promise<{ success: boolean }> {
+  await connectDB();
+
+  const hasPermission = await canEditContent(id);
+  if (!hasPermission) throw new Error("Bạn không có quyền xóa nội dung này");
+
+  const doc = await Content.findByIdAndDelete(id).lean() as { slug: string } | null;
+  if (!doc) throw new Error("Không tìm thấy content");
+
+  revalidatePath(`/content/${doc.slug}`);
+  revalidatePath("/content");
+  return { success: true };
+}
+
+// ──────────────────────────────────────────────
 // GET: Lấy tất cả slugs (cho generateStaticParams & sitemap)
 // ──────────────────────────────────────────────
 export async function getAllContentSlugs(): Promise<
@@ -204,16 +230,12 @@ export async function getAllContentSlugs(): Promise<
   const contents = await Content.find({}, { slug: 1, updatedAt: 1 }).lean();
   return serializeDoc(contents) as unknown as Array<{ slug: string; updatedAt: string }>;
 }
-// ──────────────────────────────────────────────
-// DELETE: Xóa content
-// ──────────────────────────────────────────────
-export async function deleteContent(id: string): Promise<{ success: boolean }> {
-  await requireAuth();
-  await connectDB();
-  const doc = await Content.findByIdAndDelete(id).lean() as { slug: string } | null;
-  if (!doc) throw new Error("Không tìm thấy content");
 
-  revalidatePath(`/content/${doc.slug}`);
-  revalidatePath("/content");
-  return { success: true };
+// ──────────────────────────────────────────────
+// GET: Kiểm tra quyền edit (dùng ở client)
+// ──────────────────────────────────────────────
+export async function checkContentEditPermission(contentId: string) {
+  await connectDB();
+  const can = await canEditContent(contentId);
+  return { canEdit: can };
 }

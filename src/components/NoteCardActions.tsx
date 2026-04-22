@@ -4,9 +4,9 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useTransition, useState } from "react";
+import { useTransition, useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
-import { deleteNote, togglePinNote } from "@/actions/note";
+import { deleteNote, togglePinNote, checkNoteEditPermission } from "@/actions/note";
 
 interface NoteCardActionsProps {
   noteId: string;
@@ -20,8 +20,14 @@ export default function NoteCardActions({ noteId, noteSlug, isPinned }: NoteCard
   const [deletePending, startDeleteTransition] = useTransition();
   const [pinPending, startPinTransition] = useTransition();
   const [confirming, setConfirming] = useState(false);
+  const [canEdit, setCanEdit] = useState(false);
 
-  if (status === "loading" || !session) return null;
+  useEffect(() => {
+    if (!session) return;
+    checkNoteEditPermission(noteId).then(({ canEdit }) => setCanEdit(canEdit));
+  }, [session, noteId]);
+
+  if (status === "loading" || !session || !canEdit) return null;
 
   const handlePin = () => {
     startPinTransition(async () => {

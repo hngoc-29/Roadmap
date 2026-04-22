@@ -1,5 +1,5 @@
 // ============================================================
-// COMPONENTS/NAVBAR.TSX - Navigation Bar với Auth
+// COMPONENTS/NAVBAR.TSX - Navigation Bar với Auth + Mobile Menu
 // ============================================================
 
 "use client";
@@ -21,36 +21,46 @@ export default function NavBar() {
   const pathname = usePathname();
   const { data: session, status } = useSession();
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const mobileMenuRef = useRef<HTMLDivElement>(null);
 
-  // Close dropdown when clicking outside
+  // Close dropdowns when clicking outside
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setDropdownOpen(false);
+      }
+      if (mobileMenuRef.current && !mobileMenuRef.current.contains(e.target as Node)) {
+        setMobileMenuOpen(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // Close mobile menu on route change
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [pathname]);
+
   return (
-    <header className="sticky top-0 z-30 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between">
+    // z-20 để không che toolbar roadmap (z-30+)
+    <header className="sticky top-0 z-20 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <div className="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between gap-2">
         {/* Logo */}
         <Link
           href="/"
-          className="flex items-center gap-2 font-bold text-base tracking-tight hover:opacity-80 transition-opacity"
+          className="flex items-center gap-2 font-bold text-base tracking-tight hover:opacity-80 transition-opacity shrink-0"
         >
           <span className="text-xl">🗺️</span>
           <span className="hidden sm:inline">Roadmap Builder</span>
         </Link>
 
-        {/* Nav links */}
-        <nav className="flex items-center gap-1">
+        {/* Desktop Nav links */}
+        <nav className="hidden md:flex items-center gap-1">
           {NAV_LINKS.map(({ href, label }) => {
-            const active =
-              href === "/" ? pathname === "/" : pathname.startsWith(href);
+            const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
             return (
               <Link
                 key={href}
@@ -68,9 +78,9 @@ export default function NavBar() {
           })}
         </nav>
 
-        {/* Right side: CTA + Auth */}
+        {/* Right side */}
         <div className="flex items-center gap-2">
-          {/* Tạo Roadmap button - chỉ hiện khi đã đăng nhập */}
+          {/* Tạo Roadmap button - desktop only */}
           {session && (
             <Link
               href="/builder/new"
@@ -115,32 +125,20 @@ export default function NavBar() {
                     <p className="text-sm font-medium truncate">{session.user?.name}</p>
                     <p className="text-xs text-muted-foreground truncate">{session.user?.email}</p>
                   </div>
-                  <Link
-                    href="/builder/new"
-                    onClick={() => setDropdownOpen(false)}
-                    className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted transition-colors"
-                  >
+                  <Link href="/builder/new" onClick={() => setDropdownOpen(false)}
+                    className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted transition-colors">
                     <span>➕</span> Tạo Roadmap mới
                   </Link>
-                  <Link
-                    href="/blog/new"
-                    onClick={() => setDropdownOpen(false)}
-                    className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted transition-colors"
-                  >
+                  <Link href="/blog/new" onClick={() => setDropdownOpen(false)}
+                    className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted transition-colors">
                     <span>✍️</span> Viết bài mới
                   </Link>
-                  <Link
-                    href="/content/new"
-                    onClick={() => setDropdownOpen(false)}
-                    className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted transition-colors"
-                  >
+                  <Link href="/content/new" onClick={() => setDropdownOpen(false)}
+                    className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted transition-colors">
                     <span>📄</span> Thêm nội dung
                   </Link>
-                  <Link
-                    href="/notes/new"
-                    onClick={() => setDropdownOpen(false)}
-                    className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted transition-colors"
-                  >
+                  <Link href="/notes/new" onClick={() => setDropdownOpen(false)}
+                    className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted transition-colors">
                     <span>📝</span> Tạo ghi chú
                   </Link>
                   <div className="border-t border-border mt-1 pt-1">
@@ -166,6 +164,56 @@ export default function NavBar() {
               <span className="hidden sm:inline">Đăng nhập</span>
             </button>
           )}
+
+          {/* Hamburger button — mobile only */}
+          <div className="relative md:hidden" ref={mobileMenuRef}>
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="p-2 rounded-lg hover:bg-muted transition-colors"
+              aria-label="Menu"
+            >
+              {mobileMenuOpen ? (
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              ) : (
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              )}
+            </button>
+
+            {mobileMenuOpen && (
+              <div className="absolute right-0 mt-1 w-52 bg-card border border-border rounded-xl shadow-lg py-1 z-50">
+                {NAV_LINKS.map(({ href, label }) => {
+                  const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
+                  return (
+                    <Link
+                      key={href}
+                      href={href}
+                      className={cn(
+                        "flex items-center px-3 py-2.5 text-sm font-medium transition-colors",
+                        active
+                          ? "bg-primary/10 text-primary"
+                          : "text-foreground hover:bg-muted"
+                      )}
+                    >
+                      {label}
+                    </Link>
+                  );
+                })}
+                {session && (
+                  <>
+                    <div className="border-t border-border my-1" />
+                    <Link href="/builder/new"
+                      className="flex items-center gap-2 px-3 py-2.5 text-sm font-medium hover:bg-muted transition-colors">
+                      ➕ Tạo Roadmap mới
+                    </Link>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </header>

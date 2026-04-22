@@ -4,9 +4,9 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useTransition, useState } from "react";
+import { useTransition, useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
-import { deleteNote, togglePinNote } from "@/actions/note";
+import { deleteNote, togglePinNote, checkNoteEditPermission } from "@/actions/note";
 
 interface NoteDetailActionsProps {
   noteId: string;
@@ -21,9 +21,15 @@ export default function NoteDetailActions({ noteId, noteSlug, isPinned }: NoteDe
   const [pinPending, startPinTransition] = useTransition();
   const [confirming, setConfirming] = useState(false);
   const [pinned, setPinned] = useState(isPinned);
+  const [canEdit, setCanEdit] = useState(false);
+
+  useEffect(() => {
+    if (!session) return;
+    checkNoteEditPermission(noteId).then(({ canEdit }) => setCanEdit(canEdit));
+  }, [session, noteId]);
 
   if (status === "loading") return <div className="h-9 w-64 rounded-xl bg-muted animate-pulse" />;
-  if (!session) return null;
+  if (!session || !canEdit) return null;
 
   const handlePin = () => {
     startPinTransition(async () => {

@@ -4,9 +4,9 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useTransition, useState } from "react";
+import { useTransition, useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
-import { deleteContent } from "@/actions/content";
+import { deleteContent, checkContentEditPermission } from "@/actions/content";
 
 interface ContentDetailActionsProps {
   contentId: string;
@@ -18,9 +18,15 @@ export default function ContentDetailActions({ contentId, contentSlug }: Content
   const { data: session, status } = useSession();
   const [isPending, startTransition] = useTransition();
   const [confirming, setConfirming] = useState(false);
+  const [canEdit, setCanEdit] = useState(false);
+
+  useEffect(() => {
+    if (!session) return;
+    checkContentEditPermission(contentId).then(({ canEdit }) => setCanEdit(canEdit));
+  }, [session, contentId]);
 
   if (status === "loading") return <div className="h-9 w-44 rounded-xl bg-muted animate-pulse" />;
-  if (!session) return null;
+  if (!session || !canEdit) return null;
 
   const handleDelete = () => {
     if (!confirming) { setConfirming(true); return; }

@@ -20,6 +20,26 @@ async function requireAuth() {
   return session;
 }
 
+// Helper: kiểm tra quyền edit/delete note (chỉ owner)
+async function canEditNote(noteId: string) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user) return false;
+
+  const note = await Note.findById(noteId, { ownerId: 1, ownerEmail: 1 }).lean() as {
+    ownerId?: string; ownerEmail?: string;
+  } | null;
+
+  if (!note) return false;
+  // Note cũ chưa có owner → cho phép edit (backward compat)
+  if (!note.ownerId && !note.ownerEmail) return true;
+
+  const userId = (session.user as { id?: string }).id;
+  const userEmail = session.user.email ?? "";
+  if (note.ownerId && note.ownerId === userId) return true;
+  if (note.ownerEmail && note.ownerEmail === userEmail) return true;
+  return false;
+}
+
 export interface INote {
   _id?: string;
   id?: string;
@@ -30,6 +50,8 @@ export interface INote {
   isPinned: boolean;
   tags?: string[];
   roadmapSlug?: string;
+  ownerId?: string;
+  ownerEmail?: string;
   createdAt?: Date | string;
   updatedAt?: Date | string;
 }
@@ -100,7 +122,11 @@ export async function createNote(data: {
   roadmapSlug?: string;
 }): Promise<INote> {
   await connectDB();
-  await requireAuth();
+  const session = await requireAuth();
+
+  const userId = (session.user as { id?: string } | undefined)?.id;
+  const userEmail = session.user?.email ?? "";
+
   const baseSlug = createSlug(data.title) || nanoidSafe();
   const existing = await Note.findOne({ slug: baseSlug });
   const slug = existing ? `${baseSlug}-${nanoidSafe()}` : baseSlug;
@@ -113,6 +139,8 @@ export async function createNote(data: {
     isPinned: data.isPinned ?? false,
     tags: data.tags ?? [],
     roadmapSlug: data.roadmapSlug,
+    ownerId: userId,
+    ownerEmail: userEmail,
   });
 
   revalidatePath("/notes");
@@ -127,7 +155,9 @@ export async function updateNote(
   data: Partial<Omit<INote, "_id" | "id" | "createdAt" | "updatedAt">>
 ): Promise<{ success: boolean }> {
   await connectDB();
-  await requireAuth();
+
+  const hasPermission = await canEditNote(id);
+  if (!hasPermission) throw new Error("Bạn không có quyền chỉnh sửa ghi chú này");
 
   const doc = await Note.findByIdAndUpdate(
     id,
@@ -147,8 +177,10 @@ export async function updateNote(
 // UPDATE: Toggle pin
 // ──────────────────────────────────────────────
 export async function togglePinNote(id: string, pin: boolean): Promise<{ success: boolean }> {
-  await requireAuth();
   await connectDB();
+
+  const hasPermission = await canEditNote(id);
+  if (!hasPermission) throw new Error("Bạn không có quyền thực hiện thao tác này");
 
   const doc = await Note.findByIdAndUpdate(
     id,
@@ -166,8 +198,11 @@ export async function togglePinNote(id: string, pin: boolean): Promise<{ success
 // DELETE: Xóa ghi chú
 // ──────────────────────────────────────────────
 export async function deleteNote(id: string): Promise<{ success: boolean }> {
-  await requireAuth();
   await connectDB();
+
+  const hasPermission = await canEditNote(id);
+  if (!hasPermission) throw new Error("Bạn không có quyền xóa ghi chú này");
+
   const doc = await Note.findByIdAndDelete(id).lean() as { slug: string } | null;
   if (!doc) throw new Error("Không tìm thấy ghi chú");
 
@@ -183,4 +218,13 @@ export async function getAllNoteSlugs(): Promise<Array<{ slug: string; updatedAt
   await connectDB();
   const notes = await Note.find({}, { slug: 1, updatedAt: 1 }).lean();
   return serializeDoc(notes) as unknown as Array<{ slug: string; updatedAt: string }>;
+}
+
+// ──────────────────────────────────────────────
+// GET: Kiểm tra quyền edit (dùng ở client)
+// ──────────────────────────────────────────────
+export async function checkNoteEditPermission(noteId: string) {
+  await connectDB();
+  const can = await canEditNote(noteId);
+  return { canEdit: can };
 }

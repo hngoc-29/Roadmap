@@ -12,6 +12,8 @@ export interface INoteDocument extends Document {
   isPinned: boolean;
   tags?: string[];
   roadmapSlug?: string; // liên kết tới roadmap nếu có
+  ownerId?: string;
+  ownerEmail?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -41,6 +43,8 @@ const NoteSchema = new Schema<INoteDocument>(
     isPinned: { type: Boolean, default: false },
     tags: [{ type: String, trim: true, lowercase: true }],
     roadmapSlug: { type: String, trim: true, lowercase: true },
+    ownerId: { type: String, index: true },
+    ownerEmail: { type: String, index: true },
   },
   {
     timestamps: true,

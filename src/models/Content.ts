@@ -30,6 +30,8 @@ export interface IContentDocument extends Document {
   difficulty?: "beginner" | "intermediate" | "advanced";
   estimatedTime?: string;
   icon?: string;
+  ownerId?: string;
+  ownerEmail?: string;
   resources?: Array<{ title: string; url: string; type: string }>;
   createdAt: Date;
   updatedAt: Date;
@@ -65,6 +67,8 @@ const ContentSchema = new Schema<IContentDocument>(
     },
     estimatedTime: { type: String },
     icon: { type: String, default: "📄" },
+    ownerId: { type: String, index: true },
+    ownerEmail: { type: String, index: true },
     resources: [ResourceSchema],
   },
   {

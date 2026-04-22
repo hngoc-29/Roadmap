@@ -13,7 +13,6 @@ import { serializeDoc, createSlug } from "@/lib/utils";
 import type { IPost } from "@/types";
 import { customAlphabet } from "nanoid";
 
-// 2705 FIX: Ch1ec9 d00f9ng k00fd t1ef1 lowercase alphanumeric 01111ec3 slug lu00f4n pass regex
 const nanoidSafe = customAlphabet("abcdefghijklmnopqrstuvwxyz0123456789", 6);
 
 async function requireAuth() {
@@ -22,13 +21,33 @@ async function requireAuth() {
   return session;
 }
 
+// Helper: kiểm tra quyền edit/delete post (chỉ owner)
+async function canEditPost(postId: string) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user) return false;
+
+  const post = await Post.findById(postId, { ownerId: 1, ownerEmail: 1 }).lean() as {
+    ownerId?: string; ownerEmail?: string;
+  } | null;
+
+  if (!post) return false;
+  // Post cũ chưa có owner field → cho phép edit (backward compat)
+  if (!post.ownerId && !post.ownerEmail) return true;
+
+  const userId = (session.user as { id?: string }).id;
+  const userEmail = session.user.email ?? "";
+  if (post.ownerId && post.ownerId === userId) return true;
+  if (post.ownerEmail && post.ownerEmail === userEmail) return true;
+  return false;
+}
+
 // ──────────────────────────────────────────────
 // GET: Tất cả bài viết đã publish (cho trang /blog)
 // ──────────────────────────────────────────────
 export async function getAllPosts(): Promise<IPost[]> {
   await connectDB();
   const posts = await Post.find(
-    {}, // ✅ FIX: hiển thị cả draft
+    {},
     {
       title: 1, slug: 1, description: 1,
       author: 1, category: 1, tags: 1,
@@ -48,7 +67,7 @@ export async function getAllPosts(): Promise<IPost[]> {
 // ──────────────────────────────────────────────
 export async function getPostBySlug(slug: string): Promise<IPost | null> {
   await connectDB();
-  const post = await Post.findOne({ slug }).lean(); // ✅ FIX: draft load được
+  const post = await Post.findOne({ slug }).lean();
   if (!post) return null;
   return serializeDoc(post) as unknown as IPost;
 }
@@ -60,10 +79,7 @@ export async function getAllPostSlugs(): Promise<
   Array<{ slug: string; updatedAt: string }>
 > {
   await connectDB();
-  const posts = await Post.find(
-    {}, // ✅ FIX: hiển thị cả draft
-    { slug: 1, updatedAt: 1 }
-  ).lean();
+  const posts = await Post.find({}, { slug: 1, updatedAt: 1 }).lean();
   return serializeDoc(posts) as unknown as Array<{
     slug: string;
     updatedAt: string;
@@ -76,7 +92,7 @@ export async function getAllPostSlugs(): Promise<
 export async function getPostsByCategory(category: string): Promise<IPost[]> {
   await connectDB();
   const posts = await Post.find(
-    { category }, // ✅ FIX
+    { category },
     { title: 1, slug: 1, description: 1, author: 1, tags: 1, coverImage: 1, publishedAt: 1 }
   )
     .sort({ publishedAt: -1 })
@@ -106,8 +122,12 @@ export async function createPost(data: {
   relatedRoadmaps?: string[];
   isPublished?: boolean;
 }): Promise<IPost> {
-  await connectDB()
-  await requireAuth();
+  await connectDB();
+  const session = await requireAuth();
+
+  const userId = (session.user as { id?: string } | undefined)?.id;
+  const userEmail = session.user?.email ?? "";
+  const userImage = session.user?.image ?? undefined;
 
   const baseSlug = createSlug(data.title) || nanoidSafe();
   const existing = await Post.findOne({ slug: baseSlug });
@@ -120,7 +140,9 @@ export async function createPost(data: {
     content:
       data.content ??
       `# ${data.title}\n\nThêm nội dung bài viết ở đây...\n\n## Giới thiệu\n\n...\n\n## Nội dung chính\n\n...\n\n## Kết luận\n\n...`,
-    author: { name: data.authorName ?? "Roadmap Builder" },
+    author: { name: data.authorName ?? "Roadmap Builder", avatar: userImage },
+    ownerId: userId,
+    ownerEmail: userEmail,
     category: data.category,
     tags: data.tags ?? [],
     coverImage: data.coverImage,
@@ -130,7 +152,6 @@ export async function createPost(data: {
     viewCount: 0,
   });
 
-  // revalidateTag("posts"); // ✅ Removed: not needed with force-dynamic
   revalidatePath("/blog");
   return serializeDoc(doc.toJSON()) as unknown as IPost;
 }
@@ -143,7 +164,10 @@ export async function updatePost(
   data: Partial<Omit<IPost, "_id" | "id" | "createdAt" | "updatedAt">>
 ): Promise<{ success: boolean }> {
   await connectDB();
-  await requireAuth();
+
+  const hasPermission = await canEditPost(id);
+  if (!hasPermission) throw new Error("Bạn không có quyền chỉnh sửa bài viết này");
+
   // Nếu publish lần đầu thì set publishedAt
   const existing = await Post.findById(id).lean() as { isPublished?: boolean } | null;
   const publishedAt =
@@ -168,7 +192,6 @@ export async function updatePost(
   const updated = doc as unknown as { slug: string };
   revalidatePath(`/blog/${updated.slug}`);
   revalidatePath("/blog");
-  // revalidateTag("posts"); // ✅ Removed: not needed with force-dynamic
 
   return { success: true };
 }
@@ -177,13 +200,15 @@ export async function updatePost(
 // DELETE: Xóa bài viết
 // ──────────────────────────────────────────────
 export async function deletePost(id: string): Promise<{ success: boolean }> {
-  await requireAuth();
   await connectDB();
+
+  const hasPermission = await canEditPost(id);
+  if (!hasPermission) throw new Error("Bạn không có quyền xóa bài viết này");
+
   const doc = await Post.findByIdAndDelete(id).lean() as { slug: string } | null;
   if (!doc) throw new Error("Không tìm thấy bài viết");
 
   revalidatePath("/blog");
-  // revalidateTag("posts"); // ✅ Removed: not needed with force-dynamic
   return { success: true };
 }
 
@@ -199,4 +224,13 @@ export async function getDraftPosts(): Promise<IPost[]> {
     .sort({ updatedAt: -1 })
     .lean();
   return serializeDoc(posts) as unknown as IPost[];
+}
+
+// ──────────────────────────────────────────────
+// GET: Kiểm tra quyền edit (dùng ở client)
+// ──────────────────────────────────────────────
+export async function checkPostEditPermission(postId: string) {
+  await connectDB();
+  const can = await canEditPost(postId);
+  return { canEdit: can };
 }

@@ -28,6 +28,8 @@ export interface IPostDocument extends Document {
   description?: string;
   coverImage?: string;
   author: { name: string; avatar?: string };
+  ownerId?: string;
+  ownerEmail?: string;
   category?: string;
   tags?: string[];
   relatedRoadmaps?: string[]; // mảng slugs của roadmap liên quan
@@ -68,6 +70,8 @@ const PostSchema = new Schema<IPostDocument>(
       name: { type: String, required: true, default: "Roadmap Builder" },
       avatar: { type: String },
     },
+    ownerId: { type: String, index: true },
+    ownerEmail: { type: String, index: true },
     category: { type: String, trim: true },
     tags: [{ type: String, trim: true, lowercase: true }],
     // Slugs của các roadmap có liên quan → hiển thị ở sidebar
