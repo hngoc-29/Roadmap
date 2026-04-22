@@ -59,13 +59,32 @@ export async function getAllContent() {
 // ──────────────────────────────────────────────
 // GET: Tìm kiếm content theo từ khoá (cho picker trong modal)
 // ──────────────────────────────────────────────
+// ──────────────────────────────────────────────
+// GET: Tìm kiếm content theo từ khoá (picker trong modal)
+// 🔐 Chỉ trả về content của user hiện tại (hoặc legacy không có owner)
+// ──────────────────────────────────────────────
 export async function searchContent(query: string): Promise<IContent[]> {
   await connectDB();
+
+  // Xây dựng owner filter: chỉ content của mình hoặc legacy chưa có owner
+  const session = await getServerSession(authOptions);
+  const userId = session?.user ? (session.user as { id?: string }).id : null;
+  const userEmail = session?.user?.email ?? null;
+
+  const ownerFilter = userId || userEmail
+    ? {
+        $or: [
+          ...(userId ? [{ ownerId: userId }] : []),
+          ...(userEmail ? [{ ownerEmail: userEmail }] : []),
+          { ownerId: { $exists: false }, ownerEmail: { $exists: false } },
+        ],
+      }
+    : { ownerId: { $exists: false }, ownerEmail: { $exists: false } };
 
   const trimmed = query.trim();
   if (!trimmed) {
     const results = await Content.find(
-      {},
+      ownerFilter,
       { title: 1, slug: 1, description: 1, icon: 1, difficulty: 1, estimatedTime: 1 }
     )
       .sort({ createdAt: -1 })
@@ -75,7 +94,7 @@ export async function searchContent(query: string): Promise<IContent[]> {
   }
 
   const results = await Content.find(
-    { $text: { $search: trimmed } },
+    { ...ownerFilter, $text: { $search: trimmed } },
     {
       score: { $meta: "textScore" },
       title: 1, slug: 1, description: 1, icon: 1, difficulty: 1, estimatedTime: 1,
@@ -88,7 +107,7 @@ export async function searchContent(query: string): Promise<IContent[]> {
   if (results.length === 0) {
     const regex = new RegExp(trimmed, "i");
     const fallback = await Content.find(
-      { $or: [{ title: regex }, { description: regex }, { tags: regex }] },
+      { ...ownerFilter, $or: [{ title: regex }, { description: regex }, { tags: regex }] },
       { title: 1, slug: 1, description: 1, icon: 1, difficulty: 1, estimatedTime: 1 }
     )
       .limit(10)
@@ -238,4 +257,24 @@ export async function checkContentEditPermission(contentId: string) {
   await connectDB();
   const can = await canEditContent(contentId);
   return { canEdit: can };
+}
+
+// ──────────────────────────────────────────────
+// GET: Lấy content của user hiện tại (dashboard)
+// ──────────────────────────────────────────────
+export async function getMyContent(): Promise<IContent[]> {
+  const session = await getServerSession(authOptions);
+  if (!session?.user) return [];
+
+  await connectDB();
+  const userId = (session.user as { id?: string }).id;
+  const userEmail = session.user.email ?? "";
+
+  const contents = await Content.find(
+    { $or: [{ ownerId: userId }, { ownerEmail: userEmail }] },
+    { title: 1, slug: 1, description: 1, tags: 1, difficulty: 1, estimatedTime: 1, icon: 1, createdAt: 1, updatedAt: 1 }
+  )
+    .sort({ createdAt: -1 })
+    .lean();
+  return serializeDoc(contents) as unknown as IContent[];
 }

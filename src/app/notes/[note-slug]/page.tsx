@@ -94,6 +94,33 @@ export default async function NoteDetailPage({
   const note = await getNoteBySlug(slug);
   if (!note) notFound();
 
+  // 🔐 Kiểm tra quyền truy cập — chỉ owner mới được xem ghi chú
+  const userId = (session.user as { id?: string })?.id;
+  const userEmail = session.user?.email ?? "";
+  const isOwner =
+    (!note.ownerId && !note.ownerEmail) || // backward compat
+    (note.ownerId && note.ownerId === userId) ||
+    (note.ownerEmail && note.ownerEmail === userEmail);
+
+  if (!isOwner) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center px-4">
+        <div className="max-w-md w-full text-center border border-destructive/30 rounded-2xl p-10 bg-destructive/5">
+          <p className="text-5xl mb-4">🔒</p>
+          <h1 className="text-xl font-bold mb-2 text-destructive">Không có quyền truy cập</h1>
+          <p className="text-muted-foreground text-sm mb-6">
+            Ghi chú này là riêng tư và không được chia sẻ với bạn.
+            Chỉ chủ sở hữu mới có thể xem nội dung này.
+          </p>
+          <Link href="/notes"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors">
+            ← Về danh sách ghi chú
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   const bgClass = COLOR_BG[note.color ?? "default"] ?? COLOR_BG.default;
   const noteId  = (note._id ?? note.id) as string;
 

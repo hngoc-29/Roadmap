@@ -62,7 +62,7 @@ interface IRoadmapLean {
 export async function getPublishedRoadmaps() {
   await connectDB();
   const roadmaps = await Roadmap.find(
-    {},
+    { isPublished: true }, // 🔐 Chỉ trả về roadmap đã publish
     {
       title: 1, slug: 1, description: 1, author: 1, category: 1, tags: 1,
       coverImage: 1, viewCount: 1, isPublished: 1, createdAt: 1, updatedAt: 1,

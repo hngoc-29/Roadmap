@@ -15,6 +15,7 @@ const NAV_LINKS = [
   { href: "/content", label: "📚 Nội dung" },
   { href: "/blog", label: "✍️ Blog" },
   { href: "/notes", label: "📝 Ghi chú" },
+  { href: "/guide", label: "📖 Hướng dẫn" },
 ];
 
 export default function NavBar() {
@@ -125,6 +126,11 @@ export default function NavBar() {
                     <p className="text-sm font-medium truncate">{session.user?.name}</p>
                     <p className="text-xs text-muted-foreground truncate">{session.user?.email}</p>
                   </div>
+                  <Link href="/dashboard" onClick={() => setDropdownOpen(false)}
+                    className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted transition-colors">
+                    <span>📊</span> Dashboard của tôi
+                  </Link>
+                  <div className="border-t border-border my-0.5" />
                   <Link href="/builder/new" onClick={() => setDropdownOpen(false)}
                     className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted transition-colors">
                     <span>➕</span> Tạo Roadmap mới

@@ -57,12 +57,27 @@ export interface INote {
 }
 
 // ──────────────────────────────────────────────
-// GET: Tất cả ghi chú (pinned trước)
+// GET: Ghi chú của user hiện tại (pinned trước)
+// ⚠️  Ghi chú luôn là riêng tư – chỉ trả về của session user
 // ──────────────────────────────────────────────
 export async function getAllNotes(): Promise<INote[]> {
+  const session = await getServerSession(authOptions);
+  if (!session?.user) return [];
+
   await connectDB();
+  const userId = (session.user as { id?: string }).id;
+  const userEmail = session.user.email ?? "";
+
+  // Chỉ lấy ghi chú thuộc về user hiện tại
   const notes = await Note.find(
-    {},
+    {
+      $or: [
+        { ownerId: userId },
+        { ownerEmail: userEmail },
+        // backward compat: ghi chú cũ chưa có owner field
+        { ownerId: { $exists: false }, ownerEmail: { $exists: false } },
+      ],
+    },
     { title: 1, slug: 1, content: 1, color: 1, isPinned: 1, tags: 1, roadmapSlug: 1, createdAt: 1, updatedAt: 1 }
   )
     .sort({ isPinned: -1, updatedAt: -1 })
@@ -81,15 +96,28 @@ export async function getNoteBySlug(slug: string): Promise<INote | null> {
 }
 
 // ──────────────────────────────────────────────
-// GET: Tìm kiếm ghi chú
+// GET: Tìm kiếm ghi chú (chỉ trong ghi chú của user)
 // ──────────────────────────────────────────────
 export async function searchNotes(query: string): Promise<INote[]> {
+  const session = await getServerSession(authOptions);
+  if (!session?.user) return [];
+
   await connectDB();
+  const userId = (session.user as { id?: string }).id;
+  const userEmail = session.user.email ?? "";
+  const ownerFilter = {
+    $or: [
+      { ownerId: userId },
+      { ownerEmail: userEmail },
+      { ownerId: { $exists: false }, ownerEmail: { $exists: false } },
+    ],
+  };
+
   const trimmed = query.trim();
   if (!trimmed) return getAllNotes();
 
   const results = await Note.find(
-    { $text: { $search: trimmed } },
+    { ...ownerFilter, $text: { $search: trimmed } },
     { score: { $meta: "textScore" }, title: 1, slug: 1, content: 1, color: 1, isPinned: 1, tags: 1 }
   )
     .sort({ score: { $meta: "textScore" } })
@@ -99,7 +127,7 @@ export async function searchNotes(query: string): Promise<INote[]> {
   if (results.length === 0) {
     const regex = new RegExp(trimmed, "i");
     const fallback = await Note.find(
-      { $or: [{ title: regex }, { content: regex }, { tags: regex }] },
+      { ...ownerFilter, $or: [{ title: regex }, { content: regex }, { tags: regex }] },
       { title: 1, slug: 1, content: 1, color: 1, isPinned: 1, tags: 1 }
     )
       .limit(15)
@@ -227,4 +255,24 @@ export async function checkNoteEditPermission(noteId: string) {
   await connectDB();
   const can = await canEditNote(noteId);
   return { canEdit: can };
+}
+
+// ──────────────────────────────────────────────
+// GET: Lấy ghi chú của user hiện tại (dashboard)
+// ──────────────────────────────────────────────
+export async function getMyNotes(): Promise<INote[]> {
+  const session = await getServerSession(authOptions);
+  if (!session?.user) return [];
+
+  await connectDB();
+  const userId = (session.user as { id?: string }).id;
+  const userEmail = session.user.email ?? "";
+
+  const notes = await Note.find(
+    { $or: [{ ownerId: userId }, { ownerEmail: userEmail }] },
+    { title: 1, slug: 1, content: 1, color: 1, isPinned: 1, tags: 1, roadmapSlug: 1, createdAt: 1, updatedAt: 1 }
+  )
+    .sort({ isPinned: -1, updatedAt: -1 })
+    .lean();
+  return serializeDoc(notes) as unknown as INote[];
 }

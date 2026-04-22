@@ -44,10 +44,11 @@ async function canEditPost(postId: string) {
 // ──────────────────────────────────────────────
 // GET: Tất cả bài viết đã publish (cho trang /blog)
 // ──────────────────────────────────────────────
+// Chỉ trả về bài viết đã publish cho trang công khai
 export async function getAllPosts(): Promise<IPost[]> {
   await connectDB();
   const posts = await Post.find(
-    {},
+    { isPublished: true }, // 🔐 Chỉ bài đã publish mới hiển thị công khai
     {
       title: 1, slug: 1, description: 1,
       author: 1, category: 1, tags: 1,
@@ -233,4 +234,29 @@ export async function checkPostEditPermission(postId: string) {
   await connectDB();
   const can = await canEditPost(postId);
   return { canEdit: can };
+}
+
+// ──────────────────────────────────────────────
+// GET: Lấy bài viết của user hiện tại (dashboard)
+// ──────────────────────────────────────────────
+export async function getMyPosts(): Promise<IPost[]> {
+  const session = await getServerSession(authOptions);
+  if (!session?.user) return [];
+
+  await connectDB();
+  const userId = (session.user as { id?: string }).id;
+  const userEmail = session.user.email ?? "";
+
+  const posts = await Post.find(
+    { $or: [{ ownerId: userId }, { ownerEmail: userEmail }] },
+    {
+      title: 1, slug: 1, description: 1, author: 1,
+      category: 1, tags: 1, isPublished: 1,
+      viewCount: 1, publishedAt: 1, createdAt: 1, updatedAt: 1,
+    }
+  )
+    .sort({ createdAt: -1 })
+    .lean();
+
+  return serializeDoc(posts) as unknown as IPost[];
 }

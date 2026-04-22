@@ -145,10 +145,33 @@ export default async function BlogPostPage({
   const post = await getPostBySlug(slug);
   if (!post) notFound();
 
-  // 🔒 Draft: chỉ admin thấy
+  // 🔒 Draft: chỉ owner mới được xem
   if (!post.isPublished) {
     const session = await getServerSession(authOptions);
     if (!session) redirect("/auth/signin");
+    const userId = (session.user as { id?: string })?.id;
+    const userEmail = session.user?.email ?? "";
+    const isOwner =
+      (!post.ownerId && !post.ownerEmail) ||
+      (post.ownerId && post.ownerId === userId) ||
+      (post.ownerEmail && post.ownerEmail === userEmail);
+    if (!isOwner) {
+      return (
+        <div className="min-h-screen bg-background flex items-center justify-center px-4">
+          <div className="max-w-md w-full text-center border border-destructive/30 rounded-2xl p-10 bg-destructive/5">
+            <p className="text-5xl mb-4">🔒</p>
+            <h1 className="text-xl font-bold mb-2 text-destructive">Bài viết chưa được công khai</h1>
+            <p className="text-muted-foreground text-sm mb-6">
+              Bài viết này đang ở chế độ nháp và chỉ chủ sở hữu mới có thể xem.
+            </p>
+            <Link href="/blog"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors">
+              ← Về danh sách bài viết
+            </Link>
+          </div>
+        </div>
+      );
+    }
   }
 
   // Fire-and-forget: tăng view count

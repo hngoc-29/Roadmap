@@ -73,6 +73,9 @@ export interface IContent {
   difficulty?: "beginner" | "intermediate" | "advanced";
   estimatedTime?: string;
   icon?: string;
+  // Auth / ownership
+  ownerId?: string;
+  ownerEmail?: string;
   resources?: Array<{
     title: string;
     url: string;
@@ -117,6 +120,9 @@ export interface IPost {
   description?: string;
   coverImage?: string;
   author: { name: string; avatar?: string };
+  // Auth / ownership
+  ownerId?: string;
+  ownerEmail?: string;
   category?: string;
   tags?: string[];
   relatedRoadmaps?: string[];
