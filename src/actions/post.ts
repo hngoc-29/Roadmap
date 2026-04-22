@@ -5,6 +5,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/lib/auth";
 import { connectDB } from "@/lib/mongodb";
 import Post from "@/models/Post";
 import { serializeDoc, createSlug } from "@/lib/utils";
@@ -13,6 +15,12 @@ import { customAlphabet } from "nanoid";
 
 // 2705 FIX: Ch1ec9 d00f9ng k00fd t1ef1 lowercase alphanumeric 01111ec3 slug lu00f4n pass regex
 const nanoidSafe = customAlphabet("abcdefghijklmnopqrstuvwxyz0123456789", 6);
+
+async function requireAuth() {
+  const session = await getServerSession(authOptions);
+  if (!session) throw new Error("Unauthorized: Bạn cần đăng nhập để thực hiện thao tác này");
+  return session;
+}
 
 // ──────────────────────────────────────────────
 // GET: Tất cả bài viết đã publish (cho trang /blog)
@@ -98,7 +106,8 @@ export async function createPost(data: {
   relatedRoadmaps?: string[];
   isPublished?: boolean;
 }): Promise<IPost> {
-  await connectDB();
+  await connectDB()
+  await requireAuth();
 
   const baseSlug = createSlug(data.title) || nanoidSafe();
   const existing = await Post.findOne({ slug: baseSlug });
@@ -134,7 +143,7 @@ export async function updatePost(
   data: Partial<Omit<IPost, "_id" | "id" | "createdAt" | "updatedAt">>
 ): Promise<{ success: boolean }> {
   await connectDB();
-
+  await requireAuth();
   // Nếu publish lần đầu thì set publishedAt
   const existing = await Post.findById(id).lean() as { isPublished?: boolean } | null;
   const publishedAt =
@@ -168,6 +177,7 @@ export async function updatePost(
 // DELETE: Xóa bài viết
 // ──────────────────────────────────────────────
 export async function deletePost(id: string): Promise<{ success: boolean }> {
+  await requireAuth();
   await connectDB();
   const doc = await Post.findByIdAndDelete(id).lean() as { slug: string } | null;
   if (!doc) throw new Error("Không tìm thấy bài viết");

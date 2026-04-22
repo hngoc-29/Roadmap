@@ -5,12 +5,20 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/lib/auth";
 import { connectDB } from "@/lib/mongodb";
 import Note from "@/models/Note";
 import { serializeDoc, createSlug } from "@/lib/utils";
 import { customAlphabet } from "nanoid";
 
 const nanoidSafe = customAlphabet("abcdefghijklmnopqrstuvwxyz0123456789", 6);
+
+async function requireAuth() {
+  const session = await getServerSession(authOptions);
+  if (!session) throw new Error("Unauthorized: Bạn cần đăng nhập để thực hiện thao tác này");
+  return session;
+}
 
 export interface INote {
   _id?: string;
@@ -92,7 +100,7 @@ export async function createNote(data: {
   roadmapSlug?: string;
 }): Promise<INote> {
   await connectDB();
-
+  await requireAuth();
   const baseSlug = createSlug(data.title) || nanoidSafe();
   const existing = await Note.findOne({ slug: baseSlug });
   const slug = existing ? `${baseSlug}-${nanoidSafe()}` : baseSlug;
@@ -119,6 +127,7 @@ export async function updateNote(
   data: Partial<Omit<INote, "_id" | "id" | "createdAt" | "updatedAt">>
 ): Promise<{ success: boolean }> {
   await connectDB();
+  await requireAuth();
 
   const doc = await Note.findByIdAndUpdate(
     id,
@@ -138,6 +147,7 @@ export async function updateNote(
 // UPDATE: Toggle pin
 // ──────────────────────────────────────────────
 export async function togglePinNote(id: string, pin: boolean): Promise<{ success: boolean }> {
+  await requireAuth();
   await connectDB();
 
   const doc = await Note.findByIdAndUpdate(
@@ -156,6 +166,7 @@ export async function togglePinNote(id: string, pin: boolean): Promise<{ success
 // DELETE: Xóa ghi chú
 // ──────────────────────────────────────────────
 export async function deleteNote(id: string): Promise<{ success: boolean }> {
+  await requireAuth();
   await connectDB();
   const doc = await Note.findByIdAndDelete(id).lean() as { slug: string } | null;
   if (!doc) throw new Error("Không tìm thấy ghi chú");

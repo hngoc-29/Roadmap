@@ -9,6 +9,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/lib/auth";
 import { connectDB } from "@/lib/mongodb";
 import Content from "@/models/Content";
 import Roadmap from "@/models/Roadmap";
@@ -18,6 +20,12 @@ import { customAlphabet } from "nanoid";
 
 // ✅ FIX: Chỉ dùng ký tự lowercase alphanumeric để slug luôn pass regex
 const nanoidSafe = customAlphabet("abcdefghijklmnopqrstuvwxyz0123456789", 6);
+
+async function requireAuth() {
+  const session = await getServerSession(authOptions);
+  if (!session) throw new Error("Unauthorized: Bạn cần đăng nhập để thực hiện thao tác này");
+  return session;
+}
 
 // ──────────────────────────────────────────────
 // GET: Lấy tất cả content (cho thư viện /content)
@@ -140,6 +148,7 @@ export async function createContent(data: {
   tags?: string[];
 }) {
   await connectDB();
+  await requireAuth();
 
   const baseSlug = createSlug(data.title) || nanoidSafe();
   const existing = await Content.findOne({ slug: baseSlug });
@@ -169,6 +178,7 @@ export async function updateContent(
   data: Partial<Omit<IContent, "_id" | "id" | "createdAt" | "updatedAt">>
 ) {
   await connectDB();
+  await requireAuth();
 
   const doc = await Content.findByIdAndUpdate(
     id,
@@ -198,6 +208,7 @@ export async function getAllContentSlugs(): Promise<
 // DELETE: Xóa content
 // ──────────────────────────────────────────────
 export async function deleteContent(id: string): Promise<{ success: boolean }> {
+  await requireAuth();
   await connectDB();
   const doc = await Content.findByIdAndDelete(id).lean() as { slug: string } | null;
   if (!doc) throw new Error("Không tìm thấy content");

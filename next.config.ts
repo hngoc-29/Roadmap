@@ -1,4 +1,7 @@
 import type { NextConfig } from "next";
+import dotenv from "dotenv";
+
+dotenv.config({ path: ".env.local" });
 
 const nextConfig: NextConfig = {
   images: {
@@ -22,6 +25,7 @@ const nextConfig: NextConfig = {
       allowedOrigins: [
         "localhost:3000",
         "opulent-waffle-wr7jg47qvqgwf575r-3000.app.github.dev",
+        process.env.NEXT_PUBLIC_APP_URL!
       ],
     },
   },

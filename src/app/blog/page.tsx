@@ -3,14 +3,16 @@
 // ============================================================
 // ✅ SSG + ISR: pre-render lúc build, revalidate mỗi 60s
 // ✅ SEO: metadata đầy đủ, JSON-LD WebPage
+// ✅ CRUD: Nút Edit + Delete trên mỗi card
 
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getAllPosts } from "@/actions/post";
 import { estimateReadingTime } from "@/lib/utils";
 import type { IPost } from "@/types";
+import BlogCardActions from "@/components/BlogCardActions";
 
-export const dynamic = "force-dynamic"; // ✅ FIX: luôn fetch mới
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Blog | Bài viết học lập trình",
@@ -37,8 +39,6 @@ function formatDate(date: Date | string | undefined): string {
 
 export default async function BlogPage() {
   const posts = await getAllPosts().catch(() => []);
-
-  // Group by category for filtering display
   const categories = [...new Set(posts.map((p) => p.category).filter(Boolean))];
 
   return (
@@ -100,73 +100,81 @@ export default async function BlogPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {posts.map((post: IPost) => {
               const readingTime = estimateReadingTime(post.content ?? "");
+              const postId = (post._id ?? post.id) as string;
               return (
-                <Link
-                  key={post._id ?? post.id}
-                  href={`/blog/${post.slug}`}
-                  className="group flex flex-col border border-border rounded-xl overflow-hidden hover:shadow-md hover:border-primary/50 transition-all bg-card"
+                <div
+                  key={postId}
+                  className="flex flex-col border border-border rounded-xl overflow-hidden hover:shadow-md hover:border-primary/50 transition-all bg-card"
                 >
-                  {/* Cover image */}
-                  {post.coverImage ? (
-                    <div
-                      className="h-40 bg-cover bg-center bg-muted"
-                      style={{ backgroundImage: `url(${post.coverImage})` }}
-                    />
-                  ) : (
-                    <div className="h-40 bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center">
-                      <span className="text-4xl opacity-30">✍️</span>
-                    </div>
-                  )}
-
-                  <div className="p-5 flex flex-col flex-1">
-                    {/* Status + Category */}
-                    <div className="flex items-center gap-2 mb-2 flex-wrap">
-                      {post.isPublished ? (
-                        <span className="text-xs font-medium px-2 py-0.5 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 rounded-full">✅ Public</span>
-                      ) : (
-                        <span className="text-xs font-medium px-2 py-0.5 bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400 rounded-full">📝 Draft</span>
-                      )}
-                      {post.category && (
-                        <span className="text-xs font-medium text-primary">{post.category}</span>
-                      )}
-                    </div>
-
-                    <h2 className="font-semibold text-base mb-2 group-hover:text-primary transition-colors line-clamp-2 leading-snug">
-                      {post.title}
-                    </h2>
-
-                    {post.description && (
-                      <p className="text-sm text-muted-foreground line-clamp-2 mb-3 flex-1">
-                        {post.description}
-                      </p>
-                    )}
-
-                    {/* Tags */}
-                    {post.tags && post.tags.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mb-3">
-                        {post.tags.slice(0, 3).map((tag) => (
-                          <span
-                            key={tag}
-                            className="text-xs px-2 py-0.5 bg-secondary text-secondary-foreground rounded"
-                          >
-                            #{tag}
-                          </span>
-                        ))}
+                  {/* Clickable area → detail page */}
+                  <Link href={`/blog/${post.slug}`} className="group flex flex-col flex-1">
+                    {/* Cover image */}
+                    {post.coverImage ? (
+                      <div
+                        className="h-40 bg-cover bg-center bg-muted"
+                        style={{ backgroundImage: `url(${post.coverImage})` }}
+                      />
+                    ) : (
+                      <div className="h-40 bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center">
+                        <span className="text-4xl opacity-30">✍️</span>
                       </div>
                     )}
 
-                    {/* Meta */}
-                    <div className="flex items-center justify-between text-xs text-muted-foreground pt-3 border-t border-border mt-auto">
-                      <span>✍️ {post.author.name}</span>
-                      <span className="flex items-center gap-2">
-                        <span>📖 {readingTime}</span>
-                        {post.publishedAt && (
-                          <span>{formatDate(post.publishedAt)}</span>
+                    <div className="p-5 flex flex-col flex-1">
+                      {/* Status + Category */}
+                      <div className="flex items-center gap-2 mb-2 flex-wrap">
+                        {post.isPublished ? (
+                          <span className="text-xs font-medium px-2 py-0.5 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 rounded-full">✅ Public</span>
+                        ) : (
+                          <span className="text-xs font-medium px-2 py-0.5 bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400 rounded-full">📝 Draft</span>
                         )}
-                      </span>
+                        {post.category && (
+                          <span className="text-xs font-medium text-primary">{post.category}</span>
+                        )}
+                      </div>
+
+                      <h2 className="font-semibold text-base mb-2 group-hover:text-primary transition-colors line-clamp-2 leading-snug">
+                        {post.title}
+                      </h2>
+
+                      {post.description && (
+                        <p className="text-sm text-muted-foreground line-clamp-2 mb-3 flex-1">
+                          {post.description}
+                        </p>
+                      )}
+
+                      {/* Tags */}
+                      {post.tags && post.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mb-3">
+                          {post.tags.slice(0, 3).map((tag) => (
+                            <span
+                              key={tag}
+                              className="text-xs px-2 py-0.5 bg-secondary text-secondary-foreground rounded"
+                            >
+                              #{tag}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Meta */}
+                      <div className="flex items-center justify-between text-xs text-muted-foreground pt-3 border-t border-border mt-auto">
+                        <span>✍️ {post.author.name}</span>
+                        <span className="flex items-center gap-2">
+                          <span>📖 {readingTime}</span>
+                          {post.publishedAt && (
+                            <span>{formatDate(post.publishedAt)}</span>
+                          )}
+                        </span>
+                      </div>
                     </div>
+                  </Link>
+
+                  {/* Action buttons — ngoài Link, không trigger navigation */}
+                  <div className="px-5 pb-4">
+                    <BlogCardActions postId={postId} postSlug={post.slug} />
                   </div>
-                </Link>
+                </div>
               );
             })}
           </div>

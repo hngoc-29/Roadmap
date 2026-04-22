@@ -14,6 +14,7 @@ const NAV_LINKS = [
   { href: "/", label: "🗺️ Roadmaps" },
   { href: "/content", label: "📚 Nội dung" },
   { href: "/blog", label: "✍️ Blog" },
+  { href: "/notes", label: "📝 Ghi chú" },
 ];
 
 export default function NavBar() {
@@ -134,6 +135,13 @@ export default function NavBar() {
                     className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted transition-colors"
                   >
                     <span>📄</span> Thêm nội dung
+                  </Link>
+                  <Link
+                    href="/notes/new"
+                    onClick={() => setDropdownOpen(false)}
+                    className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted transition-colors"
+                  >
+                    <span>📝</span> Tạo ghi chú
                   </Link>
                   <div className="border-t border-border mt-1 pt-1">
                     <button

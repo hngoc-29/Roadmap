@@ -13,6 +13,7 @@ import remarkGfm from "remark-gfm";
 import rehypeSlug from "rehype-slug";
 import rehypeHighlight from "rehype-highlight";
 import { getContentBySlug, getLinkedRoadmaps, getAllContentSlugs } from "@/actions/content";
+import ContentDetailActions from "@/components/ContentDetailActions";
 import { getCanonicalUrl, extractExcerpt, estimateReadingTime } from "@/lib/utils";
 
 export const dynamic = "force-dynamic"; // ✅ FIX: luôn fetch mới
@@ -138,6 +139,20 @@ export default async function ContentPage({
           </li>
         </ol>
       </nav>
+
+      {/* ── Actions bar: Edit / Delete ── */}
+      <div className="border-b bg-gradient-to-r from-muted/50 via-background to-background px-4 py-2.5">
+        <div className="max-w-6xl mx-auto flex items-center justify-between gap-4">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <div className="w-1 h-4 rounded-full bg-primary/50 hidden sm:block" />
+            <span className="hidden sm:block font-medium">Quản lý nội dung</span>
+          </div>
+          <ContentDetailActions
+            contentId={(content._id ?? content.id) as string}
+            contentSlug={content.slug}
+          />
+        </div>
+      </div>
 
       {/* ── Main layout ── */}
       <div className="max-w-6xl mx-auto px-4 py-10 flex gap-10">

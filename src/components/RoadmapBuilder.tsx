@@ -27,7 +27,7 @@ import { nanoid } from "nanoid";
 
 import type { IRoadmap, RoadmapNodeData, AppMode } from "@/types";
 import type { Edge } from "reactflow";
-import { saveRoadmapGraph, togglePublishRoadmap } from "@/actions/roadmap";
+import { saveRoadmapGraph, togglePublishRoadmap, deleteRoadmap } from "@/actions/roadmap";
 import { createSlug } from "@/lib/utils";
 import NodeEditModal from "./NodeEditModal";
 import CustomRoadmapNode from "./CustomRoadmapNode";
@@ -50,6 +50,24 @@ export default function RoadmapBuilder({
   const [isPublished, setIsPublished] = useState(roadmap.isPublished);
   const [publishPending, startPublishTransition] = useTransition();
   const [showShareModal, setShowShareModal] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deletePending, startDeleteTransition] = useTransition();
+
+  const handleDeleteRoadmap = useCallback(() => {
+    if (!showDeleteConfirm) { setShowDeleteConfirm(true); return; }
+    if (!roadmap._id) return;
+    startDeleteTransition(async () => {
+      try {
+        await deleteRoadmap(roadmap._id!);
+        router.push("/");
+        router.refresh();
+      } catch (err) {
+        setSaveMessage("❌ Không thể xóa roadmap.");
+        setShowDeleteConfirm(false);
+        console.error(err);
+      }
+    });
+  }, [showDeleteConfirm, roadmap._id, router]);
   const [roadmapState, setRoadmapState] = useState(roadmap);
 
   // Kiểm tra quyền edit: owner, collaborator, hoặc allowPublicEdit
@@ -290,6 +308,35 @@ export default function RoadmapBuilder({
           >
             🔗 Chia sẻ
           </button>
+
+          {/* ── Delete Roadmap button (chỉ owner + edit mode) ── */}
+          {canEdit && (
+            showDeleteConfirm ? (
+              <div className="flex items-center gap-1.5 ml-2">
+                <span className="text-xs text-red-600 dark:text-red-400 font-medium whitespace-nowrap">Xóa roadmap?</span>
+                <button
+                  onClick={handleDeleteRoadmap}
+                  disabled={deletePending}
+                  className="text-xs font-medium px-2.5 py-1.5 rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 transition-colors whitespace-nowrap"
+                >
+                  {deletePending ? "..." : "✅ Xác nhận"}
+                </button>
+                <button
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="text-xs font-medium px-2 py-1.5 rounded-lg bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors"
+                >
+                  Hủy
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={handleDeleteRoadmap}
+                className="text-xs font-medium px-3 py-1.5 rounded-lg bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400 transition-colors whitespace-nowrap ml-2"
+              >
+                🗑️ Xóa
+              </button>
+            )
+          )}
 
           {/* ── Status badge (luôn hiển thị) ── */}
           <span

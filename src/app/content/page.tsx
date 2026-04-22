@@ -1,14 +1,15 @@
 // ============================================================
 // APP/CONTENT/PAGE.TSX – Thư viện nội dung
 // ============================================================
-// Tổng hợp tất cả content độc lập, dễ tìm và tái sử dụng
+// ✅ CRUD: Nút Edit + Delete trên mỗi card
 
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getAllContent } from "@/actions/content";
 import type { IContent } from "@/types";
+import ContentCardActions from "@/components/ContentCardActions";
 
-export const dynamic = "force-dynamic"; // ✅ FIX: luôn fetch mới
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Thư viện nội dung",
@@ -70,45 +71,55 @@ export default async function ContentLibraryPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {contents.map((c: IContent) => {
               const diff = c.difficulty ? DIFFICULTY_LABELS[c.difficulty] : null;
+              const contentId = (c._id ?? c.id) as string;
               return (
-                <Link
-                  key={c._id ?? c.id}
-                  href={`/content/${c.slug}`}
-                  className="group block border border-border rounded-xl p-5 hover:shadow-md
-                             hover:border-primary/50 transition-all bg-card"
+                <div
+                  key={contentId}
+                  className="group flex flex-col border border-border rounded-xl overflow-hidden hover:shadow-md hover:border-primary/50 transition-all bg-card"
                 >
-                  <div className="flex items-start justify-between mb-3">
-                    <span className="text-2xl">{c.icon ?? "📄"}</span>
-                    {diff && (
-                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${diff.class}`}>
-                        {diff.label}
-                      </span>
+                  {/* Clickable area */}
+                  <Link
+                    href={`/content/${c.slug}`}
+                    className="block p-5 flex-1"
+                  >
+                    <div className="flex items-start justify-between mb-3">
+                      <span className="text-2xl">{c.icon ?? "📄"}</span>
+                      {diff && (
+                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${diff.class}`}>
+                          {diff.label}
+                        </span>
+                      )}
+                    </div>
+
+                    <h2 className="font-semibold text-base mb-1.5 group-hover:text-primary transition-colors line-clamp-2">
+                      {c.title}
+                    </h2>
+
+                    {c.description && (
+                      <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
+                        {c.description}
+                      </p>
                     )}
+
+                    <div className="flex items-center justify-between text-xs text-muted-foreground mt-auto pt-3 border-t border-border">
+                      {c.estimatedTime ? (
+                        <span>⏱️ {c.estimatedTime}</span>
+                      ) : (
+                        <span />
+                      )}
+                      {c.tags && c.tags.length > 0 && (
+                        <span className="truncate max-w-[120px]">
+                          #{c.tags.slice(0, 2).join(" #")}
+                        </span>
+                      )}
+                    </div>
+                  </Link>
+
+                  {/* Action buttons */}
+                  <div className="px-5 pb-4">
+                    <ContentCardActions contentId={contentId} contentSlug={c.slug} />
                   </div>
-
-                  <h2 className="font-semibold text-base mb-1.5 group-hover:text-primary transition-colors line-clamp-2">
-                    {c.title}
-                  </h2>
-
-                  {c.description && (
-                    <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
-                      {c.description}
-                    </p>
-                  )}
-
-                  <div className="flex items-center justify-between text-xs text-muted-foreground mt-auto pt-3 border-t border-border">
-                    {c.estimatedTime ? (
-                      <span>⏱️ {c.estimatedTime}</span>
-                    ) : (
-                      <span />
-                    )}
-                    {c.tags && c.tags.length > 0 && (
-                      <span className="truncate max-w-[120px]">
-                        #{c.tags.slice(0, 2).join(" #")}
-                      </span>
-                    )}
-                  </div>
-                </Link>
+                </div>
               );
             })}
           </div>
