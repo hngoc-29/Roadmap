@@ -1,0 +1,372 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================================
+   FONT STACK – system fonts, no network dependency
+   ============================================================ */
+@layer base {
+  :root {
+    --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+      "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --font-mono: "Fira Code", "Cascadia Code", ui-monospace, "SF Mono",
+      "Roboto Mono", "Courier New", monospace;
+  }
+}
+
+/* ============================================================
+   SHADCN/UI COLOR SYSTEM – Light Mode
+   ============================================================ */
+@layer base {
+  :root {
+    --background:       0   0%  100%;
+    --foreground:     224  71%    4%;
+    --card:             0   0%  100%;
+    --card-foreground:224  71%    4%;
+    --popover:          0   0%  100%;
+    --popover-foreground:224 71%  4%;
+    --primary:        220  91%   52%;    /* vivid blue */
+    --primary-foreground: 0 0%  100%;
+    --secondary:      220  14%   96%;
+    --secondary-foreground: 221 39% 11%;
+    --muted:          220  14%   96%;
+    --muted-foreground:220   9%   46%;
+    --accent:         220  14%   96%;
+    --accent-foreground:221 39%  11%;
+    --destructive:      0  84%   60%;
+    --destructive-foreground: 0 0% 98%;
+    --border:         220  13%   91%;
+    --input:          220  13%   91%;
+    --ring:           220  91%   52%;
+    --radius:         0.6rem;
+
+    /* ── Roadmap node status colours ── */
+    --node-completed: 142  76%   36%;
+    --node-active:    217  91%   60%;
+    --node-locked:    220   9%   70%;
+    --node-available: 220  14%   96%;
+
+    /* ── Syntax highlight palette (light) ── */
+    --code-bg:        220  20%   97%;
+    --code-border:    220  13%   88%;
+    --code-text:      230  60%   18%;
+    --code-keyword:   262  83%   58%;
+    --code-string:    120  40%   30%;
+    --code-comment:   220   9%   55%;
+    --code-number:     14  80%   42%;
+    --code-fn:        207  82%   40%;
+  }
+
+  .dark {
+    --background:     224  71%    4%;
+    --foreground:     210  20%   98%;
+    --card:           222  47%    7%;
+    --card-foreground:210  20%   98%;
+    --popover:        222  47%    7%;
+    --popover-foreground:210 20% 98%;
+    --primary:        214  90%   62%;
+    --primary-foreground: 222 47% 7%;
+    --secondary:      215  28%   17%;
+    --secondary-foreground:210 20% 98%;
+    --muted:          215  28%   17%;
+    --muted-foreground:218  11%   65%;
+    --accent:         215  28%   17%;
+    --accent-foreground:210 20%  98%;
+    --destructive:      0  63%   31%;
+    --destructive-foreground:210 20% 98%;
+    --border:         217  33%   17%;
+    --input:          217  33%   17%;
+    --ring:           214  90%   62%;
+
+    /* ── Syntax highlight palette (dark) ── */
+    --code-bg:        222  47%    9%;
+    --code-border:    217  33%   20%;
+    --code-text:      210  20%   93%;
+    --code-keyword:   280  95%   75%;
+    --code-string:    125  40%   60%;
+    --code-comment:   218  11%   50%;
+    --code-number:     38  90%   65%;
+    --code-fn:        200  95%   60%;
+  }
+}
+
+/* ============================================================
+   BASE RESETS
+   ============================================================ */
+@layer base {
+  * { @apply border-border; }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-sans);
+    font-feature-settings: "rlig" 1, "calt" 1;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Smooth scroll for anchor links */
+  html { scroll-behavior: smooth; }
+
+  /* Focus visible ring */
+  :focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+  }
+}
+
+/* ============================================================
+   ROADMAP NODE STYLES
+   ============================================================ */
+@layer components {
+  .roadmap-node {
+    @apply border-2 rounded-xl bg-card text-card-foreground shadow-sm;
+    /* ✅ Proper padding so content doesn't touch edges */
+    padding: 12px 16px;
+    min-width: 160px;
+    max-width: 220px;
+    cursor: pointer;
+    transition: box-shadow 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+  }
+
+  .roadmap-node:hover {
+    @apply shadow-md;
+    transform: translateY(-1px);
+  }
+
+  /* ── Status variants ── */
+  .roadmap-node--completed {
+    @apply border-green-400 bg-green-50 dark:bg-green-950/40 dark:border-green-600;
+  }
+  .roadmap-node--active {
+    @apply border-blue-400 bg-blue-50 dark:bg-blue-950/40 dark:border-blue-500;
+    box-shadow: 0 0 0 3px hsl(217 91% 60% / 0.15);
+  }
+  .roadmap-node--locked {
+    @apply border-gray-200 bg-gray-50 dark:bg-gray-900/60 dark:border-gray-700 opacity-60 cursor-not-allowed;
+  }
+  .roadmap-node--available {
+    @apply border-border bg-card;
+  }
+
+  /* React Flow node border-radius override */
+  .react-flow__node { border-radius: 0 !important; }
+  .react-flow__edge-path { stroke-width: 2; }
+  .react-flow__handle {
+    width: 10px !important;
+    height: 10px !important;
+  }
+}
+
+/* ============================================================
+   CODE BLOCKS – high contrast syntax highlighting
+   NOTE: highlight.js/styles/github.css is imported in layout.tsx
+   The rules below override it with our custom theme vars.
+   ============================================================ */
+@layer components {
+  /* Container — rehype-highlight puts .hljs on <code>, not <pre> */
+  pre:has(> code.hljs),
+  pre.hljs {
+    background: hsl(var(--code-bg)) !important;
+    border: 1px solid hsl(var(--code-border)) !important;
+    border-radius: 0.6rem !important;
+    padding: 1.25rem 1.5rem !important;
+    overflow-x: auto;
+    font-family: var(--font-mono) !important;
+    font-size: 0.85rem !important;
+    line-height: 1.7 !important;
+  }
+
+  pre > code.hljs,
+  pre.hljs,
+  code.hljs {
+    background: transparent !important;
+    padding: 0 !important;
+    border: none !important;
+    font-family: var(--font-mono) !important;
+    font-size: 0.85rem !important;
+    line-height: 1.7 !important;
+    color: hsl(var(--code-text)) !important;
+  }
+
+  div.hljs {
+    background: hsl(var(--code-bg)) !important;
+    border: 1px solid hsl(var(--code-border)) !important;
+    border-radius: 0.6rem !important;
+    padding: 1.25rem 1.5rem !important;
+    overflow-x: auto;
+    font-family: var(--font-mono) !important;
+    font-size: 0.85rem !important;
+    line-height: 1.7 !important;
+    color: hsl(var(--code-text)) !important;
+  }
+
+  /* Inline code */
+  :not(pre) > code {
+    background: hsl(var(--code-bg)) !important;
+    border: 1px solid hsl(var(--code-border));
+    color: hsl(var(--code-text)) !important;
+    font-family: var(--font-mono) !important;
+    font-size: 0.82em;
+    padding: 0.15em 0.45em;
+    border-radius: 0.3rem;
+    font-weight: 500;
+  }
+
+  /* ── Token colours – high contrast ── */
+  .hljs-keyword,
+  .hljs-selector-tag,
+  .hljs-built_in,
+  .hljs-name,
+  .hljs-tag {
+    color: hsl(var(--code-keyword)) !important;
+    font-weight: 600;
+  }
+  .hljs-string,
+  .hljs-attr,
+  .hljs-attribute {
+    color: hsl(var(--code-string)) !important;
+  }
+  .hljs-comment,
+  .hljs-quote {
+    color: hsl(var(--code-comment)) !important;
+    font-style: italic;
+  }
+  .hljs-number,
+  .hljs-literal,
+  .hljs-variable,
+  .hljs-template-variable {
+    color: hsl(var(--code-number)) !important;
+  }
+  .hljs-title,
+  .hljs-section,
+  .hljs-function,
+  .hljs-title.class_ {
+    color: hsl(var(--code-fn)) !important;
+    font-weight: 600;
+  }
+  .hljs-type,
+  .hljs-class,
+  .hljs-subst {
+    color: hsl(38 90% 48%) !important;
+  }
+  .hljs-meta {
+    color: hsl(var(--code-comment)) !important;
+  }
+  .hljs-addition { color: hsl(125 40% 38%) !important; background: hsl(125 40% 38% / 0.1); }
+  .hljs-deletion  { color: hsl(0 70% 50%)   !important; background: hsl(0 70% 50% / 0.1); }
+
+  /* Dark mode overrides */
+  .dark pre:has(> code.hljs),
+  .dark pre.hljs,
+  .dark pre > code.hljs,
+  .dark code.hljs {
+    color: hsl(var(--code-text)) !important;
+  }
+
+  /* Scrollbar in code blocks */
+  pre::-webkit-scrollbar { height: 6px; }
+  pre::-webkit-scrollbar-track { background: transparent; }
+  pre::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 3px; }
+}
+
+/* ============================================================
+   PROSE / MDX CONTENT
+   ============================================================ */
+@layer components {
+  .prose-content {
+    @apply text-foreground;
+    @apply prose prose-slate dark:prose-invert max-w-none;
+
+    /* Headings */
+    @apply prose-headings:scroll-mt-24 prose-headings:font-bold prose-headings:tracking-tight;
+    @apply prose-h1:text-3xl prose-h2:text-2xl prose-h3:text-xl;
+    @apply prose-h2:mt-10 prose-h3:mt-7;
+
+    /* Paragraph */
+    @apply prose-p:text-base prose-p:leading-7 prose-p:text-foreground/90;
+
+    /* Links */
+    @apply prose-a:text-primary prose-a:no-underline prose-a:font-medium;
+    @apply hover:prose-a:underline;
+
+    /* Lists */
+    @apply prose-li:marker:text-primary/60;
+
+    /* Blockquote */
+    @apply prose-blockquote:border-l-primary/60 prose-blockquote:text-muted-foreground;
+    @apply prose-blockquote:not-italic;
+
+    /* Tables */
+    @apply prose-th:bg-muted/60 prose-th:font-semibold;
+    @apply prose-td:border-border prose-th:border-border;
+
+    /* Code — let our .hljs rules handle the styling */
+    @apply prose-code:before:content-none prose-code:after:content-none;
+    /* Reset prose's pre styles so our hljs rules take effect */
+    @apply prose-pre:p-0 prose-pre:bg-transparent prose-pre:border-0 prose-pre:rounded-none prose-pre:my-4;
+
+    /* HR */
+    @apply prose-hr:border-border;
+
+    /* Strong */
+    @apply prose-strong:font-semibold prose-strong:text-foreground;
+  }
+}
+
+/* ============================================================
+   SKELETON / LOADING
+   ============================================================ */
+@layer utilities {
+  .skeleton {
+    @apply animate-pulse rounded bg-muted;
+  }
+}
+
+/* ============================================================
+   ANIMATIONS
+   ============================================================ */
+@layer utilities {
+  .animate-in {
+    animation: fade-in 0.25s ease-out;
+  }
+
+  @keyframes fade-in {
+    from { opacity: 0; transform: translateY(4px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Subtle slide-up for cards */
+  .animate-slide-up {
+    animation: slide-up 0.3s ease-out;
+  }
+
+  @keyframes slide-up {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+}
+
+/* ============================================================
+   SCROLLBAR – global subtle style
+   ============================================================ */
+::-webkit-scrollbar       { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--border));
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground)); }
+
+/* ============================================================
+   REACT FLOW – clean canvas overrides
+   ============================================================ */
+.react-flow__background { opacity: 0.5; }
+.react-flow__minimap { border-radius: 8px; overflow: hidden; }
+.react-flow__controls {
+  border-radius: 10px !important;
+  overflow: hidden;
+  box-shadow: 0 2px 8px hsl(0 0% 0% / 0.08) !important;
+}
+.react-flow__controls button {
+  border-bottom: 1px solid hsl(var(--border)) !important;
+}
