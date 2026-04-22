@@ -370,3 +370,33 @@
 .react-flow__controls button {
   border-bottom: 1px solid hsl(var(--border)) !important;
 }
+
+/* ============================================================
+   KATEX – LaTeX / Toán học / Vật lý / Hoá học
+   ============================================================ */
+
+/* Inline math */
+.prose-content .katex {
+  font-size: 1.05em;
+}
+
+/* Block/display math – căn giữa, có padding */
+.prose-content .katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 1rem 0;
+  margin: 1.25rem 0;
+  text-align: center;
+}
+
+/* Scrollbar ngang cho công thức dài */
+.prose-content .katex-display::-webkit-scrollbar {
+  height: 4px;
+}
+.prose-content .katex-display::-webkit-scrollbar-thumb {
+  background: hsl(var(--border));
+  border-radius: 2px;
+}
+
+/* Màu sắc KaTeX thừa hưởng từ theme */
+.katex { color: hsl(var(--foreground)); }

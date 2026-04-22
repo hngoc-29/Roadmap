@@ -7,6 +7,10 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { MDXRemote } from "next-mdx-remote/rsc";
 import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
+import rehypeSlug from "rehype-slug";
+import rehypeHighlight from "rehype-highlight";
 import { getNoteBySlug, getAllNoteSlugs } from "@/actions/note";
 import NoteDetailActions from "@/components/NoteDetailActions";
 import { getServerSession } from "next-auth/next";
@@ -191,7 +195,7 @@ export default async function NoteDetailPage({
               <MDXRemote
                 source={note.content}
                 components={mdxComponents}
-                options={{ mdxOptions: { remarkPlugins: [remarkGfm] } }}
+                options={{ mdxOptions: { remarkPlugins: [remarkGfm, remarkMath], rehypePlugins: [rehypeSlug, rehypeHighlight, rehypeKatex] } }}
               />
             ) : (
               <p className="text-muted-foreground italic">Ghi chú này chưa có nội dung.</p>

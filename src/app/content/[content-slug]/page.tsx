@@ -12,6 +12,8 @@ import { MDXRemote } from "next-mdx-remote/rsc";
 import remarkGfm from "remark-gfm";
 import rehypeSlug from "rehype-slug";
 import rehypeHighlight from "rehype-highlight";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
 import { getContentBySlug, getLinkedRoadmaps, getAllContentSlugs } from "@/actions/content";
 import ContentDetailActions from "@/components/ContentDetailActions";
 import { getCanonicalUrl, extractExcerpt, estimateReadingTime } from "@/lib/utils";
@@ -223,8 +225,8 @@ export default async function ContentPage({
                 components={mdxComponents}
                 options={{
                   mdxOptions: {
-                    remarkPlugins: [remarkGfm],
-                    rehypePlugins: [rehypeSlug, rehypeHighlight],
+                    remarkPlugins: [remarkGfm, remarkMath],
+                    rehypePlugins: [rehypeSlug, rehypeHighlight, rehypeKatex],
                   },
                 }}
               />

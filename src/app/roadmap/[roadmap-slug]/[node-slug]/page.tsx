@@ -10,6 +10,8 @@ import { MDXRemote } from "next-mdx-remote/rsc";
 import remarkGfm from "remark-gfm";
 import rehypeSlug from "rehype-slug";
 import rehypeHighlight from "rehype-highlight";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
 import { getNodeBySlug, getAllRoadmapSlugs } from "@/actions/roadmap";
 import { getCanonicalUrl, extractExcerpt, estimateReadingTime } from "@/lib/utils";
 import { ArticleJsonLd } from "@/components/JsonLd";
@@ -161,7 +163,7 @@ export default async function NodeLessonPage({
             <MDXRemote
               source={nodeData.content}
               components={mdxComponents}
-              options={{ mdxOptions: { remarkPlugins: [remarkGfm], rehypePlugins: [rehypeSlug, rehypeHighlight] } }}
+              options={{ mdxOptions: { remarkPlugins: [remarkGfm, remarkMath], rehypePlugins: [rehypeSlug, rehypeHighlight, rehypeKatex] } }}
             />
           ) : (
             <p className="text-muted-foreground italic">Nội dung đang được cập nhật...</p>

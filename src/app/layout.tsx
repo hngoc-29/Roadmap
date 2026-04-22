@@ -5,10 +5,11 @@
 import type { Metadata, Viewport } from "next";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import NavBar from "@/components/NavBar";
+import FloatingMenu from "@/components/FloatingMenu";
 import SessionProvider from "@/components/SessionProvider";
 import "./globals.css";
 import "highlight.js/styles/github.css";
+import "katex/dist/katex.min.css";
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -94,7 +95,8 @@ export default async function RootLayout({
           >
             Bỏ qua đến nội dung chính
           </a>
-          <NavBar />
+          {/* FloatingMenu nổi, không chiếm không gian layout */}
+          <FloatingMenu />
           <main id="main-content" className="flex-1 flex flex-col min-h-0 overflow-auto">{children}</main>
         </SessionProvider>
       </body>
