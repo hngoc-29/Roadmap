@@ -15,7 +15,7 @@ export const metadata: Metadata = {
 
 // ── Inline component definitions (không tách file riêng) ─────
 
-type BadgeColor = "green" | "blue" | "purple" | "orange" | "red";
+type BadgeColor = "green" | "blue" | "purple" | "orange" | "red" | "yellow" | "pink";
 
 const BADGE_COLORS: Record<BadgeColor, string> = {
   green:  "bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800",
@@ -23,6 +23,8 @@ const BADGE_COLORS: Record<BadgeColor, string> = {
   purple: "bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-800",
   orange: "bg-orange-100 text-orange-700 border-orange-200 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-800",
   red:    "bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800",
+  yellow: "bg-yellow-100 text-yellow-700 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400 dark:border-yellow-800",
+  pink:   "bg-pink-100 text-pink-700 border-pink-200 dark:bg-pink-900/30 dark:text-pink-400 dark:border-pink-800",
 };
 
 function Tag({ label, color = "blue" }: { label: string; color?: BadgeColor }) {
@@ -193,9 +195,9 @@ export default function GuidePage() {
                 Nhấn <strong>💾 Lưu</strong> để lưu thay đổi. Khi sẵn sàng chia sẻ,
                 bật <strong>📤 Publish</strong> để roadmap xuất hiện công khai trên trang chủ.
               </Step>
-              <Step number={5} title="Chia sẻ và cộng tác">
-                Mở <strong>Cài đặt chia sẻ</strong> để thêm collaborators (theo email)
-                hoặc bật chế độ <em>Mọi người có thể sửa</em> cho phép công khai chỉnh sửa.
+              <Step number={5} title="Chia sẻ với cộng tác viên">
+                Nhấn nút <strong>🔗 Chia sẻ</strong> để mở ShareModal. Thêm GitHub username
+                của cộng tác viên để cấp quyền chỉnh sửa roadmap của bạn.
               </Step>
             </div>
             <InfoBox type="tip">
@@ -464,7 +466,7 @@ console.log(hello);
                 },
                 {
                   q: "Roadmap của tôi có bị người khác chỉnh sửa không?",
-                  a: "Mặc định thì không. Chỉ chủ sở hữu và collaborators được thêm vào mới có quyền chỉnh sửa. Bạn có thể bật 'Mọi người có thể sửa' nếu muốn cho phép cộng đồng đóng góp.",
+                  a: "Mặc định thì không. Chỉ chủ sở hữu và collaborators được thêm vào qua ShareModal mới có quyền chỉnh sửa.",
                 },
                 {
                   q: "Ghi chú của tôi có bị người khác xem không?",
@@ -481,6 +483,10 @@ console.log(hello);
                 {
                   q: "Bài viết nháp có xuất hiện trên trang chủ không?",
                   a: "Không. Trang chủ và danh sách blog chỉ hiển thị bài đã publish. Bài nháp chỉ bạn mới thấy trong Dashboard và khi truy cập trực tiếp URL.",
+                },
+                {
+                  q: "Tôi cần tài khoản gì để đăng nhập?",
+                  a: "Roadmap Builder dùng GitHub OAuth. Bạn cần có tài khoản GitHub. Nhấn nút 'Đăng nhập bằng GitHub' tại /auth/signin để xác thực.",
                 },
               ].map(({ q, a }) => (
                 <Card key={q}>
