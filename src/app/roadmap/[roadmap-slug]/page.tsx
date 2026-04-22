@@ -80,12 +80,12 @@ export default async function RoadmapPage({
   if (roadmap.isPublished) void incrementViewCount(slug);
 
   return (
-    <>
+    <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
       {roadmap.isPublished && <CourseJsonLd roadmap={roadmap as IRoadmap} />}
 
       {/* ✅ Banner Draft — nhắc nhở khi chưa publish */}
       {!roadmap.isPublished && (
-        <div className="w-full bg-yellow-50 dark:bg-yellow-900/20 border-b border-yellow-200 dark:border-yellow-800 px-4 py-2 flex items-center justify-center gap-2 text-sm text-yellow-800 dark:text-yellow-300">
+        <div className="w-full bg-yellow-50 dark:bg-yellow-900/20 border-b border-yellow-200 dark:border-yellow-800 px-4 py-2 flex items-center justify-center gap-2 text-sm text-yellow-800 dark:text-yellow-300 flex-shrink-0">
           <span>📝</span>
           <span className="font-medium">Chế độ Draft</span>
           <span className="text-yellow-600 dark:text-yellow-400 ml-1 hidden sm:inline">
@@ -98,6 +98,6 @@ export default async function RoadmapPage({
         roadmap={roadmap as IRoadmap}
         mode={initialMode}
       />
-    </>
+    </div>
   );
 }

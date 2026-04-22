@@ -73,7 +73,7 @@ export default async function RootLayout({
 
   return (
     <html lang="vi" suppressHydrationWarning>
-      <body className="antialiased min-h-screen bg-background font-sans">
+      <body className="antialiased h-screen flex flex-col bg-background font-sans overflow-hidden">
         <SessionProvider session={session}>
           <a
             href="#main-content"
@@ -84,7 +84,7 @@ export default async function RootLayout({
             Bỏ qua đến nội dung chính
           </a>
           <NavBar />
-          <main id="main-content">{children}</main>
+          <main id="main-content" className="flex-1 flex flex-col min-h-0 overflow-auto">{children}</main>
         </SessionProvider>
       </body>
     </html>

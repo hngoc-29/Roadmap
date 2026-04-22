@@ -230,8 +230,7 @@ export default function RoadmapBuilder({
     // ✅ FIX: Wrapper bọc cả toolbar + canvas
     // flex-col đảm bảo toolbar trên, canvas dưới — không chồng lên nhau
     <div
-      className="w-full flex flex-col"
-      style={{ height: "calc(100vh - 3.5rem)" }}
+      className="w-full flex flex-col flex-1 min-h-0"
     >
       {/* ══════════════════════════════════════════════
           TOOLBAR BAR — nằm NGOÀI ReactFlow
