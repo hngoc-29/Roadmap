@@ -4,6 +4,10 @@
 // ✅ FIX LAYOUT: Toolbar được đưa ra NGOÀI ReactFlow thành một
 //    bar cố định phía trên canvas — không còn đè lên title nữa.
 //    Cấu trúc: [Toolbar bar] + [ReactFlow canvas bên dưới]
+//
+// ✅ FIX ADD NODE: Khi thêm node mới, lập tức saveRoadmapGraph
+//    để node tồn tại trong MongoDB trước khi mở modal. Tránh lỗi
+//    "không tìm thấy node" khi updateNodeContent được gọi.
 
 "use client";
 
@@ -102,10 +106,10 @@ export default function RoadmapBuilder({
   const [editingNode, setEditingNode] = useState<{
     id: string;
     data: RoadmapNodeData;
-    isNew?: boolean;
   } | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isAddingNode, setIsAddingNode] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout>>(null);
 
@@ -138,7 +142,19 @@ export default function RoadmapBuilder({
     [mode, setEdges]
   );
 
-  const handleAddNode = useCallback(() => {
+  // ──────────────────────────────────────────────────────────────
+  // ✅ FIX: handleAddNode lưu node vào DB ngay lập tức
+  //
+  // Vấn đề cũ: node mới chỉ tồn tại trong React state. Khi user
+  // đóng modal rồi click lại node đó, updateNodeContent sẽ fail
+  // vì MongoDB không có node đó.
+  //
+  // Fix: Sau khi tạo node mới, gọi saveRoadmapGraph ngay để node
+  // tồn tại trong DB. Modal sau đó mở bình thường (không cần isNew).
+  // ──────────────────────────────────────────────────────────────
+  const handleAddNode = useCallback(async () => {
+    if (!roadmap._id || isAddingNode) return;
+
     const newLabel = "Node mới";
     const newNode = {
       id: nanoid(),
@@ -152,12 +168,44 @@ export default function RoadmapBuilder({
         icon: "📚",
       } satisfies RoadmapNodeData,
     };
-    setNodes((nds) => [...nds, newNode]);
-    setTimeout(() => {
-      setEditingNode({ id: newNode.id, data: newNode.data, isNew: true });
+
+    // 1. Cập nhật React state ngay để UI phản hồi tức thì
+    const updatedNodes = [...nodes, newNode];
+    setNodes(updatedNodes);
+    setIsAddingNode(true);
+
+    try {
+      // 2. Lưu lên MongoDB ngay — node phải tồn tại trong DB
+      //    trước khi modal gọi updateNodeContent
+      await saveRoadmapGraph(roadmap._id, {
+        nodes: updatedNodes.map((n) => ({
+          id: n.id,
+          type: n.type,
+          position: n.position,
+          data: n.data as RoadmapNodeData,
+        })),
+        edges: edges.map((e) => ({
+          id: e.id,
+          source: e.source,
+          target: e.target,
+          type: e.type,
+          animated: e.animated,
+          label: e.label as string | undefined,
+        })),
+      });
+
+      // 3. Mở modal — node đã có trong DB, updateNodeContent sẽ hoạt động bình thường
+      setEditingNode({ id: newNode.id, data: newNode.data });
       setIsModalOpen(true);
-    }, 100);
-  }, [setNodes]);
+    } catch (err) {
+      // Nếu lưu DB thất bại: xóa node khỏi React state để tránh state không đồng bộ
+      setNodes((nds) => nds.filter((n) => n.id !== newNode.id));
+      setSaveMessage("❌ Không thể tạo node mới. Vui lòng thử lại.");
+      console.error(err);
+    } finally {
+      setIsAddingNode(false);
+    }
+  }, [roadmap._id, isAddingNode, nodes, edges, setNodes]);
 
   const handleSave = useCallback(async () => {
     if (isSaving) return;
@@ -269,9 +317,10 @@ export default function RoadmapBuilder({
             <>
               <button
                 onClick={handleAddNode}
-                className="text-xs font-medium px-3 py-1.5 rounded-lg bg-secondary hover:bg-secondary/80 transition-colors whitespace-nowrap"
+                disabled={isAddingNode}
+                className="text-xs font-medium px-3 py-1.5 rounded-lg bg-secondary hover:bg-secondary/80 disabled:opacity-50 transition-colors whitespace-nowrap"
               >
-                ➕ Thêm node
+                {isAddingNode ? "⏳ Đang tạo..." : "➕ Thêm node"}
               </button>
 
               <button
@@ -431,7 +480,7 @@ export default function RoadmapBuilder({
           nodeData={editingNode.data}
           roadmapId={roadmap._id!}
           isOpen={isModalOpen}
-          isNew={editingNode.isNew ?? false}
+          isNew={false}
           onClose={() => {
             setIsModalOpen(false);
             setEditingNode(null);
