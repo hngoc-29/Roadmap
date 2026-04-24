@@ -148,7 +148,19 @@ export default async function NoteDetailPage({
             <div className="w-1 h-4 rounded-full bg-primary/50 hidden sm:block" />
             <span className="hidden sm:block font-medium">Quản lý ghi chú</span>
           </div>
-          <NoteDetailActions noteId={noteId} noteSlug={note.slug} isPinned={note.isPinned} />
+          <NoteDetailActions
+            noteId={noteId}
+            noteSlug={note.slug}
+            isPinned={note.isPinned}
+            noteData={{
+              slug: note.slug,
+              title: note.title,
+              content: note.content,
+              color: note.color,
+              isPinned: note.isPinned,
+              tags: note.tags,
+            }}
+          />
         </div>
       </div>
 

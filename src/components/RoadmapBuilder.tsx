@@ -33,6 +33,7 @@ import type { IRoadmap, RoadmapNodeData, AppMode } from "@/types";
 import type { Edge } from "reactflow";
 import { saveRoadmapGraph, togglePublishRoadmap, deleteRoadmap } from "@/actions/roadmap";
 import { createSlug } from "@/lib/utils";
+import { createZipBlob, downloadBlob } from "@/lib/client-zip";
 import NodeEditModal from "./NodeEditModal";
 import CustomRoadmapNode from "./CustomRoadmapNode";
 import ShareModal from "./ShareModal";
@@ -254,6 +255,94 @@ export default function RoadmapBuilder({
     });
   }, [roadmap._id, isPublished]);
 
+  // ── Export ZIP ──────────────────────────────────────────────
+  // Tạo ZIP client-side (không qua server → không bị 4.5MB Vercel limit)
+  // Chứa: roadmap.json (dữ liệu đầy đủ, content là md string)
+  //       roadmap.md  (nội dung tổng hợp dễ đọc/sửa)
+  //       nodes/[slug].md (file md riêng cho từng node)
+  const handleExportZip = useCallback(() => {
+    const currentNodes = nodes;
+    const currentEdges = edges;
+
+    // 1. Build JSON export (giữ nguyên cấu trúc, content là md string)
+    const exportData = {
+      ...roadmap,
+      nodes: currentNodes.map((n) => ({
+        id: n.id,
+        type: n.type,
+        position: n.position,
+        data: n.data,
+      })),
+      edges: currentEdges.map((e) => ({
+        id: e.id,
+        source: e.source,
+        target: e.target,
+        type: e.type,
+        animated: e.animated,
+      })),
+      exportedAt: new Date().toISOString(),
+    };
+
+    // 2. Build markdown tổng hợp (cùng nội dung với JSON)
+    const mdLines: string[] = [
+      `# ${roadmap.title}`,
+      ``,
+      roadmap.description ? `> ${roadmap.description}` : "",
+      ``,
+      `**Tác giả:** ${roadmap.author?.name ?? "—"}  `,
+      `**Danh mục:** ${roadmap.category ?? "—"}  `,
+      `**Tags:** ${(roadmap.tags ?? []).join(", ") || "—"}`,
+      ``,
+      `---`,
+      ``,
+      `## Danh sách Node`,
+      ``,
+    ];
+
+    for (const n of currentNodes) {
+      const d = n.data;
+      mdLines.push(`### ${d.icon ?? "📍"} ${d.label}`);
+      mdLines.push(`**Slug:** \`${d.slug}\` | **Trạng thái:** ${d.status ?? "—"} | **Độ khó:** ${d.difficulty ?? "—"} | **Thời gian:** ${d.estimatedTime ?? "—"}`);
+      if (d.description) mdLines.push(`\n> ${d.description}`);
+      mdLines.push(``);
+      if (d.content) {
+        mdLines.push(d.content);
+        mdLines.push(``);
+      }
+      mdLines.push(`---`);
+      mdLines.push(``);
+    }
+
+    const combinedMd = mdLines.filter((l) => l !== "").join("\n");
+
+    // 3. Tạo entries ZIP
+    const zipEntries = [
+      { name: `${roadmap.slug}.json`, content: JSON.stringify(exportData, null, 2) },
+      { name: `${roadmap.slug}.md`, content: combinedMd },
+    ];
+
+    // Thêm file md riêng cho từng node có content
+    for (const n of currentNodes) {
+      const d = n.data;
+      if (d.content?.trim()) {
+        const nodeMd = [
+          `# ${d.icon ?? ""} ${d.label}`.trim(),
+          ``,
+          d.description ? `> ${d.description}\n` : "",
+          d.content,
+        ].join("\n");
+        zipEntries.push({ name: `nodes/${d.slug}.md`, content: nodeMd });
+      }
+    }
+
+    const blob = createZipBlob(zipEntries);
+    downloadBlob(blob, `${roadmap.slug}-export.zip`);
+
+    setSaveMessage("📦 Đã export ZIP thành công!");
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    saveTimeoutRef.current = setTimeout(() => setSaveMessage(""), 3000);
+  }, [nodes, edges, roadmap]);
+
   const handleNodeSave = useCallback(
     (nodeId: string, newData: RoadmapNodeData) => {
       setNodes((nds) =>
@@ -355,6 +444,15 @@ export default function RoadmapBuilder({
             className="text-xs font-medium px-3 py-1.5 rounded-lg bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors whitespace-nowrap"
           >
             🔗 Chia sẻ
+          </button>
+
+          {/* ── Export ZIP button ── */}
+          <button
+            onClick={handleExportZip}
+            className="text-xs font-medium px-3 py-1.5 rounded-lg bg-indigo-100 text-indigo-700 hover:bg-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-300 transition-colors whitespace-nowrap"
+            title="Xuất file ZIP chứa .json và .md"
+          >
+            📦 Export ZIP
           </button>
 
           {/* ── Delete Roadmap button (chỉ owner + edit mode) ── */}

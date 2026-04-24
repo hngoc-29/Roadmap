@@ -4,7 +4,7 @@
 
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import { connectDB } from "@/lib/mongodb";
@@ -193,6 +193,9 @@ export async function updatePost(
   const updated = doc as unknown as { slug: string };
   revalidatePath(`/blog/${updated.slug}`);
   revalidatePath("/blog");
+  // Bust sitemap khi publish status thay đổi
+  revalidateTag("sitemap", "page");
+  revalidateTag("posts", "page");
 
   return { success: true };
 }
@@ -210,6 +213,8 @@ export async function deletePost(id: string): Promise<{ success: boolean }> {
   if (!doc) throw new Error("Không tìm thấy bài viết");
 
   revalidatePath("/blog");
+  revalidateTag("sitemap", "page");
+  revalidateTag("posts", "page");
   return { success: true };
 }
 

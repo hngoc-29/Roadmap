@@ -293,6 +293,17 @@ export default async function BlogPostPage({
             postId={(post._id ?? post.id) as string}
             postSlug={post.slug}
             isPublished={post.isPublished ?? false}
+            postData={{
+              title: post.title,
+              slug: post.slug,
+              description: post.description,
+              content: post.content,
+              author: post.author,
+              category: post.category,
+              tags: post.tags,
+              coverImage: post.coverImage,
+              isPublished: post.isPublished,
+            }}
           />
         </div>
       </div>

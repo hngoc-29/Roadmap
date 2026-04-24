@@ -152,6 +152,16 @@ export default async function ContentPage({
           <ContentDetailActions
             contentId={(content._id ?? content.id) as string}
             contentSlug={content.slug}
+            contentData={{
+              slug: content.slug,
+              title: content.title,
+              description: content.description,
+              content: content.content,
+              icon: content.icon,
+              difficulty: content.difficulty,
+              estimatedTime: content.estimatedTime,
+              tags: content.tags,
+            }}
           />
         </div>
       </div>

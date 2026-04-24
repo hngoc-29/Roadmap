@@ -4,7 +4,7 @@
 
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { connectDB } from "@/lib/mongodb";
@@ -289,6 +289,9 @@ export async function togglePublishRoadmap(roadmapId: string, publish: boolean) 
   const r = roadmap as unknown as { slug: string; isPublished: boolean };
   revalidatePath(`/roadmap/${r.slug}`);
   revalidatePath("/");
+  // Bust sitemap cache khi trạng thái publish thay đổi
+  revalidateTag("sitemap", "page");
+  revalidateTag("posts", "page");
 
   return { success: true, isPublished: r.isPublished };
 }
@@ -368,6 +371,8 @@ export async function deleteRoadmap(roadmapId: string): Promise<{ success: boole
 
   revalidatePath("/");
   revalidatePath(`/roadmap/${roadmap.slug}`);
+  revalidateTag("sitemap", "page");
+  revalidateTag("posts", "page");
   return { success: true };
 }
 

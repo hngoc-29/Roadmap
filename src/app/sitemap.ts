@@ -39,14 +39,19 @@ const safeDate = (d: string | Date | undefined | null): Date => {
 // Key cache độc lập với request → nhiều request đến /sitemap.xml
 // trong 12h chỉ hit DB một lần duy nhất.
 
+type RoadmapLean = {
+  slug: string;
+  nodes?: { data?: { slug?: string } }[];
+  updatedAt?: Date;
+};
+
 const getCachedPublishedRoadmaps = unstable_cache(
   async () => {
     await connectDB();
     const docs = await Roadmap.find(
       { isPublished: true },
       { slug: 1, "nodes.data.slug": 1, updatedAt: 1 }
-    ).lean();
-    // @ts-expect-error Mongoose document type mismatch with lean()
+    ).lean<RoadmapLean[]>();
     return docs as Array<{
       slug: string;
       nodes: Array<{ data: { slug: string } }>;

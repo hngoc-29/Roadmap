@@ -5,10 +5,13 @@
 
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { createNote, updateNote } from "@/actions/note";
 import type { INote } from "@/actions/note";
+import FileImportButton from "@/components/FileImportButton";
+import { safeParseJSON } from "@/lib/import-export";
+import type { NoteImportData } from "@/lib/import-export";
 
 const COLORS: { value: INote["color"]; label: string; class: string }[] = [
   { value: "default", label: "Mặc định", class: "bg-card border-border" },
@@ -29,6 +32,26 @@ export default function CreateNoteForm({ note, onSuccess }: CreateNoteFormProps)
   const [isPending, startTransition] = useTransition();
   const [error, setError]   = useState("");
   const [success, setSuccess] = useState("");
+  const [importMsg, setImportMsg] = useState("");
+
+  const showImportMsg = (msg: string) => { setImportMsg(msg); setTimeout(() => setImportMsg(""), 3500); };
+
+  const handleFileImport = useCallback((text: string, filename: string) => {
+    const ext = filename.split(".").pop()?.toLowerCase();
+    if (ext === "json") {
+      const data = safeParseJSON<NoteImportData>(text);
+      if (!data) { showImportMsg("❌ File JSON không đúng định dạng"); return; }
+      if (data.title) setTitle(data.title);
+      if (data.content !== undefined) setContent(data.content);
+      if (data.color) setColor(data.color);
+      if (data.isPinned !== undefined) setIsPinned(data.isPinned);
+      if (data.tags) setTagsInput(data.tags.join(", "));
+      showImportMsg(`✅ Đã import "${filename}" vào tất cả fields`);
+    } else {
+      setContent(text);
+      showImportMsg(`✅ Đã import "${filename}" vào nội dung`);
+    }
+  }, []);
 
   const [title,     setTitle]     = useState(note?.title   ?? "");
   const [content,   setContent]   = useState(note?.content ?? "");
@@ -78,6 +101,20 @@ export default function CreateNoteForm({ note, onSuccess }: CreateNoteFormProps)
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
+      {/* Import toolbar */}
+      <div className="flex items-center justify-between rounded-xl border border-dashed border-border bg-muted/30 px-4 py-3">
+        <div>
+          <p className="text-xs font-medium text-muted-foreground">Import từ file</p>
+          <p className="text-xs text-muted-foreground/70 mt-0.5">.txt/.md → nội dung &nbsp;·&nbsp; .json → tất cả fields</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <FileImportButton accept=".txt,.md" label=".txt / .md" onImport={handleFileImport} onError={(m) => showImportMsg(`❌ ${m}`)} />
+          <FileImportButton accept=".json" label=".json" onImport={handleFileImport} onError={(m) => showImportMsg(`❌ ${m}`)} />
+        </div>
+      </div>
+      {importMsg && (
+        <div className={`text-xs px-4 py-2 rounded-lg border ${importMsg.startsWith("✅") ? "bg-green-50 border-green-200 text-green-800 dark:bg-green-900/20 dark:border-green-800 dark:text-green-300" : "bg-red-50 border-red-200 text-red-800 dark:bg-red-900/20 dark:border-red-800 dark:text-red-300"}`}>{importMsg}</div>
+      )}
       {error && (
         <div className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-lg px-4 py-3">
           {error}

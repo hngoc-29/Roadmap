@@ -7,13 +7,24 @@ import { useRouter } from "next/navigation";
 import { useTransition, useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { deleteContent, checkContentEditPermission } from "@/actions/content";
+import { exportContentZip } from "@/lib/import-export";
 
 interface ContentDetailActionsProps {
   contentId: string;
   contentSlug: string;
+  contentData?: {
+    slug: string;
+    title: string;
+    description?: string;
+    content?: string;
+    icon?: string;
+    difficulty?: string;
+    estimatedTime?: string;
+    tags?: string[];
+  };
 }
 
-export default function ContentDetailActions({ contentId, contentSlug }: ContentDetailActionsProps) {
+export default function ContentDetailActions({ contentId, contentSlug, contentData }: ContentDetailActionsProps) {
   const router = useRouter();
   const { data: session, status } = useSession();
   const [isPending, startTransition] = useTransition();
@@ -35,11 +46,7 @@ export default function ContentDetailActions({ contentId, contentSlug }: Content
         await deleteContent(contentId);
         router.push("/content");
         router.refresh();
-      } catch (err) {
-        console.error(err);
-        alert("Lỗi khi xóa nội dung");
-        setConfirming(false);
-      }
+      } catch (err) { console.error(err); alert("Lỗi khi xóa nội dung"); setConfirming(false); }
     });
   };
 
@@ -50,9 +57,14 @@ export default function ContentDetailActions({ contentId, contentSlug }: Content
         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
         Chỉnh sửa
       </button>
-
       <div className="w-px h-5 bg-border/60 mx-0.5" />
-
+      <button onClick={() => exportContentZip(contentData ?? { slug: contentSlug, title: contentSlug })}
+        className="inline-flex items-center gap-1.5 text-sm font-medium px-3.5 py-1.5 rounded-lg text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 dark:text-indigo-400 transition-all"
+        title="Xuất file ZIP chứa .json và .md">
+        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+        Export ZIP
+      </button>
+      <div className="w-px h-5 bg-border/60 mx-0.5" />
       {confirming ? (
         <div className="flex items-center gap-1">
           <span className="text-xs text-red-600 dark:text-red-400 font-medium px-2">Xóa nội dung này?</span>
@@ -61,9 +73,7 @@ export default function ContentDetailActions({ contentId, contentSlug }: Content
             {isPending ? "Đang xóa…" : "Xác nhận"}
           </button>
           <button onClick={() => setConfirming(false)}
-            className="text-sm px-3 py-1.5 rounded-lg bg-background hover:bg-muted text-muted-foreground border border-border/40 transition-all">
-            Hủy
-          </button>
+            className="text-sm px-3 py-1.5 rounded-lg bg-background hover:bg-muted text-muted-foreground border border-border/40 transition-all">Hủy</button>
         </div>
       ) : (
         <button onClick={handleDelete}
