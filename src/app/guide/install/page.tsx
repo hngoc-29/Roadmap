@@ -47,7 +47,7 @@ export default function InstallPage() {
         <h3 className="text-lg font-semibold mb-4">🛠️ Các bước cài đặt</h3>
         <div className="border-l-2 border-border ml-3 space-y-0">
           <Step number={1} title="Clone repository">
-            <pre className="bg-muted border border-border rounded-lg px-4 py-3 text-xs font-mono mt-2 overflow-x-auto">{`git clone https://github.com/your-username/roadmap-builder.git
+            <pre className="bg-muted border border-border rounded-lg px-4 py-3 text-xs font-mono mt-2 overflow-x-auto">{`git clone https://github.com/hngoc-29/Roadmap.git roadmap-builder
 cd roadmap-builder
 npm install`}</pre>
           </Step>
