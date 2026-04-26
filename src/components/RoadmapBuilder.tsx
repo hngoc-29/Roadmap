@@ -260,9 +260,49 @@ export default function RoadmapBuilder({
   // Chứa: roadmap.json (dữ liệu đầy đủ, content là md string)
   //       roadmap.md  (nội dung tổng hợp dễ đọc/sửa)
   //       nodes/[slug].md (file md riêng cho từng node)
-  const handleExportZip = useCallback(() => {
+  //
+  // FIX: Nếu node được link tới một Content (có contentSlug),
+  //      export sẽ dùng nội dung của Content đó thay vì d.content nội tuyến.
+  const handleExportZip = useCallback(async () => {
     const currentNodes = nodes;
     const currentEdges = edges;
+
+    // Thu thập các contentSlug cần fetch (tránh fetch trùng)
+    const slugsToFetch = [
+      ...new Set(
+        currentNodes
+          .map((n) => n.data.contentSlug)
+          .filter((s): s is string => !!s)
+      ),
+    ];
+
+    // Fetch song song tất cả content được link
+    const contentMap: Record<string, string> = {};
+    if (slugsToFetch.length > 0) {
+      await Promise.all(
+        slugsToFetch.map(async (slug) => {
+          try {
+            const res = await fetch(`/api/content/${encodeURIComponent(slug)}`);
+            if (res.ok) {
+              const json = await res.json();
+              // Hỗ trợ cả { content } và { data: { content } }
+              const fetched = json?.data ?? json;
+              if (fetched?.content) contentMap[slug] = fetched.content as string;
+            }
+          } catch {
+            // Nếu fetch lỗi, fallback về d.content của node
+          }
+        })
+      );
+    }
+
+    // Helper: lấy nội dung thực tế cho một node
+    const resolveContent = (d: RoadmapNodeData): string => {
+      if (d.contentSlug && contentMap[d.contentSlug] !== undefined) {
+        return contentMap[d.contentSlug];
+      }
+      return d.content ?? "";
+    };
 
     // 1. Build JSON export (giữ nguyên cấu trúc, content là md string)
     const exportData = {
@@ -271,7 +311,11 @@ export default function RoadmapBuilder({
         id: n.id,
         type: n.type,
         position: n.position,
-        data: n.data,
+        data: {
+          ...n.data,
+          // Ghi đè content bằng nội dung đã resolve (từ linked content nếu có)
+          content: resolveContent(n.data),
+        },
       })),
       edges: currentEdges.map((e) => ({
         id: e.id,
@@ -301,12 +345,13 @@ export default function RoadmapBuilder({
 
     for (const n of currentNodes) {
       const d = n.data;
+      const resolvedContent = resolveContent(d);
       mdLines.push(`### ${d.icon ?? "📍"} ${d.label}`);
       mdLines.push(`**Slug:** \`${d.slug}\` | **Trạng thái:** ${d.status ?? "—"} | **Độ khó:** ${d.difficulty ?? "—"} | **Thời gian:** ${d.estimatedTime ?? "—"}`);
       if (d.description) mdLines.push(`\n> ${d.description}`);
       mdLines.push(``);
-      if (d.content) {
-        mdLines.push(d.content);
+      if (resolvedContent) {
+        mdLines.push(resolvedContent);
         mdLines.push(``);
       }
       mdLines.push(`---`);
@@ -321,15 +366,16 @@ export default function RoadmapBuilder({
       { name: `${roadmap.slug}.md`, content: combinedMd },
     ];
 
-    // Thêm file md riêng cho từng node có content
+    // Thêm file md riêng cho từng node có content (inline hoặc linked)
     for (const n of currentNodes) {
       const d = n.data;
-      if (d.content?.trim()) {
+      const resolvedContent = resolveContent(d);
+      if (resolvedContent.trim()) {
         const nodeMd = [
           `# ${d.icon ?? ""} ${d.label}`.trim(),
           ``,
           d.description ? `> ${d.description}\n` : "",
-          d.content,
+          resolvedContent,
         ].join("\n");
         zipEntries.push({ name: `nodes/${d.slug}.md`, content: nodeMd });
       }
