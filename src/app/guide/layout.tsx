@@ -36,8 +36,20 @@ export default function GuideLayout({ children }: { children: React.ReactNode })
         </div>
       </div>
 
+      {/* Mobile nav — full width, outside the flex row */}
+      <div className="lg:hidden max-w-6xl mx-auto px-4 pt-6">
+        <div className="flex gap-2 flex-wrap">
+          {NAV_ITEMS.map(({ href, icon, label }) => (
+            <Link key={href} href={href}
+              className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border border-border hover:bg-muted transition-colors">
+              {icon} {label}
+            </Link>
+          ))}
+        </div>
+      </div>
+
       <div className="max-w-6xl mx-auto px-4 py-10 flex gap-10">
-        {/* Sidebar */}
+        {/* Sidebar — desktop only */}
         <aside className="hidden lg:block w-56 flex-shrink-0">
           <div className="sticky top-20">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
@@ -62,20 +74,8 @@ export default function GuideLayout({ children }: { children: React.ReactNode })
           </div>
         </aside>
 
-        {/* Mobile nav */}
-        <div className="lg:hidden w-full mb-6">
-          <div className="flex gap-2 flex-wrap">
-            {NAV_ITEMS.map(({ href, icon, label }) => (
-              <Link key={href} href={href}
-                className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border border-border hover:bg-muted transition-colors">
-                {icon} {label}
-              </Link>
-            ))}
-          </div>
-        </div>
-
         {/* Main content */}
-        <main className="flex-1 min-w-0">{children}</main>
+        <main className="flex-1 min-w-0 w-full">{children}</main>
       </div>
     </div>
   );
