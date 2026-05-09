@@ -16,8 +16,7 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Blog | Bài viết học lập trình",
-  description:
-    "Các bài viết hướng dẫn, tutorial và tips học lập trình. Tái sử dụng trong nhiều roadmap khác nhau.",
+  description: "Các bài viết hướng dẫn, tutorial và tips học lập trình. Tái sử dụng trong nhiều roadmap khác nhau.",
   alternates: { canonical: "/blog" },
   openGraph: {
     type: "website",

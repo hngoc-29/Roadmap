@@ -25,11 +25,10 @@ export const metadata: Metadata = {
     process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"
   ),
   title: {
-    default: "Roadmap Builder | Tạo lộ trình học tập trực quan",
+    default: "Interactive Roadmap Builder | Tạo lộ trình học tập trực quan",
     template: "%s | Roadmap Builder",
   },
-  description:
-    "Xây dựng lộ trình học tập trực quan với công cụ kéo thả thông minh. Chia sẻ roadmap học Frontend, Backend, DevOps và nhiều hơn nữa.",
+  description: "Xây dựng lộ trình học tập trực quan với công cụ kéo thả thông minh. Chia sẻ roadmap học Frontend, Backend, DevOps và nhiều hơn nữa.",
   keywords: [
     "roadmap học tập",
     "lộ trình học lập trình",
@@ -51,11 +50,10 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "vi_VN",
-    siteName: "Roadmap Builder",
-    title: "Roadmap Builder | Tạo lộ trình học tập trực quan",
-    description:
-      "Xây dựng và chia sẻ lộ trình học tập trực quan với công cụ kéo thả thông minh.",
-    images: [{ url: "/og-default.png", width: 1200, height: 630, alt: "Roadmap Builder" }],
+    siteName: "Interactive Roadmap Builder",
+    title: "Interactive Roadmap Builder | Tạo lộ trình học tập trực quan",
+    description: "Xây dựng và chia sẻ lộ trình học tập trực quan với công cụ kéo thả thông minh.",
+    images: [{ url: "/og-default.png", width: 1200, height: 630, alt: "Interactive Roadmap Builder" }],
   },
   twitter: {
     card: "summary_large_image",

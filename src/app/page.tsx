@@ -16,14 +16,12 @@ export const dynamic = "force-dynamic"; // ✅ FIX: luôn fetch mới
 
 export const metadata: Metadata = {
   title: "Khám phá Roadmap & Blog học lập trình",
-  description:
-    "Tạo, chia sẻ và khám phá lộ trình học lập trình trực quan. Đọc blog hướng dẫn chất lượng cao từ cộng đồng.",
+  description: "Tạo, chia sẻ và khám phá lộ trình học lập trình trực quan. Đọc blog hướng dẫn chất lượng cao từ cộng đồng.",
   alternates: { canonical: "/" },
   openGraph: {
     type: "website",
-    title: "Roadmap Builder",
-    description:
-      "Xây dựng lộ trình học tập trực quan với kéo thả. Blog & Content Library tích hợp."
+    title: "Interactive Roadmap Builder",
+    description: "Xây dựng lộ trình học tập trực quan với kéo thả. Blog & Content Library tích hợp.",
     images: [{ url: "/og-default.png", width: 1200, height: 630 }],
     locale: "vi_VN",
   },

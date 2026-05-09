@@ -201,8 +201,7 @@ export function WebSiteJsonLd() {
     "@id": `${appUrl}/#website`,
     name: appName,
     url: appUrl,
-    description:
-      "Xây dựng và chia sẻ lộ trình học lập trình trực quan với công cụ kéo thả.",
+    description: "Xây dựng và chia sẻ lộ trình học lập trình trực quan với công cụ kéo thả.",
     potentialAction: {
       "@type": "SearchAction",
       target: {
