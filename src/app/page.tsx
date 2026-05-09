@@ -21,9 +21,9 @@ export const metadata: Metadata = {
   alternates: { canonical: "/" },
   openGraph: {
     type: "website",
-    title: "Interactive Roadmap Builder",
+    title: "Roadmap Builder",
     description:
-      "Xây dựng lộ trình học tập trực quan với kéo thả. Blog & Content Library tích hợp.",
+      "Xây dựng lộ trình học tập trực quan với kéo thả. Blog & Content Library tích hợp."
     images: [{ url: "/og-default.png", width: 1200, height: 630 }],
     locale: "vi_VN",
   },

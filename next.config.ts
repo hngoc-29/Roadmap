@@ -1,7 +1,4 @@
 import type { NextConfig } from "next";
-import dotenv from "dotenv";
-
-dotenv.config({ path: ".env.local" });
 
 const nextConfig: NextConfig = {
   images: {
@@ -14,18 +11,28 @@ const nextConfig: NextConfig = {
   // ✅ Next 16: mongoose chạy server-side only
   serverExternalPackages: ["mongoose"],
 
+  // ✅ FIX: Định nghĩa profile "page" ở top-level (Next.js 16 đã move ra khỏi experimental)
+  cacheLife: {
+    page: {
+      stale: 0,
+      revalidate: 0,
+      expire: 0,
+    },
+  },
+
   experimental: {
     optimizePackageImports: [
       "lucide-react",
       "reactflow",
       "@radix-ui/react-dialog",
     ],
-    // ✅ FIX: Cho phép Server Actions khi chạy qua tunnel (GitHub Codespaces, ngrok, ...)
     serverActions: {
       allowedOrigins: [
         "localhost:3000",
         "opulent-waffle-wr7jg47qvqgwf575r-3000.app.github.dev",
-        process.env.NEXT_PUBLIC_APP_URL!
+        ...(process.env.NEXT_PUBLIC_APP_URL
+          ? [process.env.NEXT_PUBLIC_APP_URL.replace(/^https?:\/\//, "")]
+          : []),
       ],
     },
   },

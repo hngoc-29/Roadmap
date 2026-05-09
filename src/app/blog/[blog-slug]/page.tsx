@@ -137,6 +137,45 @@ function formatDate(date: Date | string | undefined): string {
 }
 
 // ── Page ──
+// ── MdxContent helper (isolate MDX errors) ──
+// Wrap MDXRemote trong một component riêng để lỗi MDX không
+// crash toàn bộ trang (lỗi sẽ bị catch và hiển thị fallback)
+async function MdxContent({ source }: { source: string }) {
+  if (!source) {
+    return (
+      <p className="text-muted-foreground italic">
+        Nội dung đang được cập nhật...
+      </p>
+    );
+  }
+  try {
+    return (
+      <MDXRemote
+        source={source}
+        components={mdxComponents}
+        options={{
+          mdxOptions: {
+            remarkPlugins: [remarkGfm, remarkMath],
+            rehypePlugins: [rehypeSlug, rehypeHighlight, rehypeKatex],
+          },
+        }}
+      />
+    );
+  } catch (err) {
+    console.error("[blog] MDX render error:", err);
+    return (
+      <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-4">
+        <p className="text-sm text-destructive font-medium mb-1">
+          ⚠️ Lỗi render nội dung
+        </p>
+        <p className="text-xs text-muted-foreground">
+          Nội dung có cú pháp MDX không hợp lệ. Hãy chỉnh sửa bài viết để sửa lỗi.
+        </p>
+      </div>
+    );
+  }
+}
+
 export default async function BlogPostPage({
   params,
 }: {
@@ -176,8 +215,10 @@ export default async function BlogPostPage({
     }
   }
 
-  // Fire-and-forget: tăng view count
-  void incrementPostViewCount(slug);
+  // Fire-and-forget: tăng view count (không để lỗi crash trang)
+  incrementPostViewCount(slug).catch((e) =>
+    console.error("[blog] incrementViewCount error:", e)
+  );
 
   const readingTime = estimateReadingTime(post.content ?? "");
 
@@ -363,22 +404,7 @@ export default async function BlogPostPage({
 
           {/* MDX Content */}
           <div className="prose-content">
-            {post.content ? (
-              <MDXRemote
-                source={post.content}
-                components={mdxComponents}
-                options={{
-                  mdxOptions: {
-                    remarkPlugins: [remarkGfm, remarkMath],
-                    rehypePlugins: [rehypeSlug, rehypeHighlight, rehypeKatex],
-                  },
-                }}
-              />
-            ) : (
-              <p className="text-muted-foreground italic">
-                Nội dung đang được cập nhật...
-              </p>
-            )}
+            <MdxContent source={post.content ?? ""} />
           </div>
 
           {/* Resources */}

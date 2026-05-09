@@ -4,7 +4,7 @@
 
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import { connectDB } from "@/lib/mongodb";
@@ -193,6 +193,8 @@ export async function createContent(data: {
   });
 
   revalidatePath("/content");
+  revalidateTag("sitemap", "page");
+  revalidateTag("content", "page");
   return serializeDoc(doc.toJSON()) as unknown as IContent;
 }
 
@@ -219,6 +221,8 @@ export async function updateContent(
   const updated = doc as unknown as { slug: string };
   revalidatePath(`/content/${updated.slug}`);
   revalidatePath("/content");
+  revalidateTag("sitemap", "page");
+  revalidateTag("content", "page");
   return { success: true };
 }
 
@@ -236,6 +240,8 @@ export async function deleteContent(id: string): Promise<{ success: boolean }> {
 
   revalidatePath(`/content/${doc.slug}`);
   revalidatePath("/content");
+  revalidateTag("sitemap", "page");
+  revalidateTag("content", "page");
   return { success: true };
 }
 

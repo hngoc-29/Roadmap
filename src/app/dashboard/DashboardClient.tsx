@@ -120,7 +120,7 @@ function RoadmapTab({ roadmaps }: { roadmaps: IRoadmap[] }) {
               className="flex-1 text-center text-xs px-2 py-1.5 border border-border rounded-lg hover:bg-muted transition-colors">
               👁 Xem
             </Link>
-            <Link href={`/builder/new?edit=${rm._id}`}
+            <Link href={`/roadmap/${rm.slug}?mode=edit`}
               className="flex-1 text-center text-xs px-2 py-1.5 border border-border rounded-lg hover:bg-muted transition-colors">
               ✏️ Sửa
             </Link>
@@ -302,6 +302,13 @@ const TABS = [
 
 type TabId = (typeof TABS)[number]["id"];
 
+const STAT_META: Record<TabId, { icon: string; label: string }> = {
+  roadmaps: { icon: "🗺️", label: "Roadmaps" },
+  posts:    { icon: "✍️", label: "Bài viết" },
+  notes:    { icon: "📝", label: "Ghi chú" },
+  contents: { icon: "📚", label: "Nội dung" },
+};
+
 export function DashboardClient({ roadmaps, posts, notes, contents }: Props) {
   const [activeTab, setActiveTab] = useState<TabId>("roadmaps");
 
@@ -314,6 +321,27 @@ export function DashboardClient({ roadmaps, posts, notes, contents }: Props) {
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
+      {/* Stats — click để chuyển tab */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
+        {(Object.keys(counts) as TabId[]).map((id) => (
+          <button
+            key={id}
+            onClick={() => setActiveTab(id)}
+            className={`text-left bg-card border rounded-xl p-4 transition-all group ${
+              activeTab === id
+                ? "border-primary/60 ring-1 ring-primary/20"
+                : "border-border hover:border-primary/50"
+            }`}
+          >
+            <div className="text-2xl mb-1">{STAT_META[id].icon}</div>
+            <div className={`text-2xl font-bold transition-colors ${activeTab === id ? "text-primary" : "group-hover:text-primary"}`}>
+              {counts[id]}
+            </div>
+            <div className="text-sm text-muted-foreground">{STAT_META[id].label}</div>
+          </button>
+        ))}
+      </div>
+
       {/* Tabs */}
       <div className="flex items-center gap-1 border-b border-border mb-8 overflow-x-auto">
         {TABS.map(({ id, label }) => (

@@ -154,6 +154,8 @@ export async function createPost(data: {
   });
 
   revalidatePath("/blog");
+  revalidateTag("sitemap", "page");
+  revalidateTag("posts", "page");
   return serializeDoc(doc.toJSON()) as unknown as IPost;
 }
 

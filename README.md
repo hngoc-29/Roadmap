@@ -1,4 +1,4 @@
-# 🗺️ Interactive Roadmap Builder
+# 🗺️ Roadmap Builder
 
 Ứng dụng web xây dựng lộ trình học tập trực quan với **kéo thả**, nội dung Markdown, **Blog tích hợp**, **Ghi chú cá nhân**, và tối ưu **SEO mạnh mẽ**.
 
@@ -6,7 +6,7 @@
 
 | Layer | Công nghệ |
 |-------|-----------|
-| Framework | Next.js 15 (App Router) + TypeScript |
+| Framework | Next.js 16 (App Router) + TypeScript |
 | Database | MongoDB Atlas + Mongoose |
 | Auth | NextAuth.js v4 (GitHub OAuth) |
 | Kéo thả | React Flow v11 |
@@ -23,7 +23,7 @@
 
 ```bash
 git clone <repo-url>
-cd interactive-roadmap-builder
+cd roadmap-builder
 npm install
 ```
 
@@ -236,7 +236,7 @@ src/
 |---------|-------|
 | `generateMetadata()` | Metadata động từ MongoDB cho mỗi trang |
 | `generateStaticParams()` | SSG cho roadmap, node, content, blog |
-| ISR (60s – 3600s) | Tự động rebuild khi content thay đổi |
+| force-dynamic / ISR | Sitemap luôn fresh; pages dùng force-dynamic hoặc ISR |
 | On-demand revalidation | `/api/revalidate` khi publish |
 | JSON-LD Course | Trang roadmap → Course schema |
 | JSON-LD Article | Trang node → Article schema |

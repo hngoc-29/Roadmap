@@ -291,7 +291,7 @@ export async function togglePublishRoadmap(roadmapId: string, publish: boolean) 
   revalidatePath("/");
   // Bust sitemap cache khi trạng thái publish thay đổi
   revalidateTag("sitemap", "page");
-  revalidateTag("posts", "page");
+  revalidateTag("roadmaps", "page");
 
   return { success: true, isPublished: r.isPublished };
 }
@@ -372,7 +372,7 @@ export async function deleteRoadmap(roadmapId: string): Promise<{ success: boole
   revalidatePath("/");
   revalidatePath(`/roadmap/${roadmap.slug}`);
   revalidateTag("sitemap", "page");
-  revalidateTag("posts", "page");
+  revalidateTag("roadmaps", "page");
   return { success: true };
 }
 

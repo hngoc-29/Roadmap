@@ -76,8 +76,8 @@ npm install`}</pre>
               <p>• <strong>Homepage URL:</strong> <code className="bg-muted px-1.5 py-0.5 rounded font-mono">http://localhost:3000</code></p>
               <p>• <strong>Authorization callback URL:</strong> <code className="bg-muted px-1.5 py-0.5 rounded font-mono">http://localhost:3000/api/auth/callback/github</code></p>
             </div>
-            <pre className="bg-muted border border-border rounded-lg px-4 py-3 text-xs font-mono mt-2 overflow-x-auto">{`GITHUB_ID=your_client_id
-GITHUB_SECRET=your_client_secret`}</pre>
+            <pre className="bg-muted border border-border rounded-lg px-4 py-3 text-xs font-mono mt-2 overflow-x-auto">{`GITHUB_CLIENT_ID=your_client_id
+GITHUB_CLIENT_SECRET=your_client_secret`}</pre>
           </Step>
 
           <Step number={5} title="Cấu hình NextAuth">
@@ -102,8 +102,8 @@ NEXTAUTH_SECRET=your_random_secret_string`}</pre>
 MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/roadmap
 
 # GitHub OAuth
-GITHUB_ID=your_github_client_id
-GITHUB_SECRET=your_github_client_secret
+GITHUB_CLIENT_ID=your_github_client_id
+GITHUB_CLIENT_SECRET=your_github_client_secret
 
 # NextAuth
 NEXTAUTH_URL=http://localhost:3000

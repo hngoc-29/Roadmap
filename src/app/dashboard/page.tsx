@@ -76,22 +76,7 @@ export default async function DashboardPage() {
             </div>
           </div>
 
-          {/* Stats overview */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-6">
-            {[
-              { icon: "🗺️", label: "Roadmaps", count: roadmaps.length, href: "#roadmaps" },
-              { icon: "✍️", label: "Bài viết", count: posts.length, href: "#posts" },
-              { icon: "📝", label: "Ghi chú", count: notes.length, href: "#notes" },
-              { icon: "📚", label: "Nội dung", count: contents.length, href: "#contents" },
-            ].map(({ icon, label, count, href }) => (
-              <a key={label} href={href}
-                className="bg-card border border-border rounded-xl p-4 hover:border-primary/50 transition-colors group">
-                <div className="text-2xl mb-1">{icon}</div>
-                <div className="text-2xl font-bold group-hover:text-primary transition-colors">{count}</div>
-                <div className="text-sm text-muted-foreground">{label}</div>
-              </a>
-            ))}
-          </div>
+          {/* Stats overview — rendered inside DashboardClient để click activate tab */}
         </div>
       </div>
 

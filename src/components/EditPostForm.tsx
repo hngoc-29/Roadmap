@@ -91,7 +91,19 @@ export default function EditPostForm({ post }: EditPostFormProps) {
         setSuccess("✅ Đã lưu thay đổi!");
         setTimeout(() => router.push(`/blog/${post.slug}`), 800);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Có lỗi xảy ra. Vui lòng thử lại.");
+        const msg = err instanceof Error ? err.message : "";
+        // Phân loại lỗi thường gặp
+        if (msg.includes("Unauthorized") || msg.includes("đăng nhập")) {
+          setError("⚠️ Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.");
+        } else if (msg.includes("quyền")) {
+          setError("🔒 Bạn không có quyền chỉnh sửa bài viết này.");
+        } else if (msg.includes("validation") || msg.includes("Slug")) {
+          setError("❌ Dữ liệu không hợp lệ. Kiểm tra lại tiêu đề và nội dung.");
+        } else if (msg) {
+          setError(msg);
+        } else {
+          setError("Có lỗi xảy ra. Vui lòng thử lại.");
+        }
         console.error(err);
       }
     });
