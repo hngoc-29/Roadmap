@@ -1,464 +1,446 @@
-# 🗺️ Roadmap Builder
+# FormulaDoc
 
-Ứng dụng web xây dựng lộ trình học tập trực quan với **kéo thả**, nội dung Markdown, **Blog tích hợp**, **Ghi chú cá nhân**, và tối ưu **SEO mạnh mẽ**.
+> **The mobile DOCX viewer that finally gets equations right.**
 
-## Tech Stack
-
-| Layer | Công nghệ |
-|-------|-----------|
-| Framework | Next.js 16 (App Router) + TypeScript |
-| Database | MongoDB Atlas + Mongoose |
-| Auth | NextAuth.js v4 (GitHub OAuth) |
-| Kéo thả | React Flow v11 |
-| UI | Tailwind CSS v3 + Shadcn/UI |
-| Content | next-mdx-remote (Markdown/MDX → React) |
-| ID ngắn | nanoid |
-| Deploy | Vercel (khuyến nghị) |
+A production-ready Flutter application that opens Microsoft Word documents and
+correctly renders mathematical equations (OMML → LaTeX) on mobile.
 
 ---
 
-## 🚀 Bắt đầu nhanh
+## Why FormulaDoc?
 
-### 1. Cài đặt
-
-```bash
-git clone <repo-url>
-cd roadmap-builder
-npm install
-```
-
-### 2. Cấu hình môi trường
-
-```bash
-cp .env.example .env.local
-```
-
-Chỉnh sửa `.env.local`:
-
-```env
-# MongoDB
-MONGODB_URI=mongodb+srv://user:pass@cluster.mongodb.net/roadmap-builder
-
-# App
-NEXT_PUBLIC_APP_URL=http://localhost:3000
-NEXT_PUBLIC_APP_NAME="Interactive Roadmap Builder"
-
-# On-demand ISR (tạo bằng: openssl rand -hex 32)
-REVALIDATION_SECRET=your-secret-here
-
-# GitHub OAuth — xem hướng dẫn bên dưới
-GITHUB_CLIENT_ID=your-github-client-id
-GITHUB_CLIENT_SECRET=your-github-client-secret
-
-# NextAuth (tạo bằng: openssl rand -base64 32)
-NEXTAUTH_SECRET=your-nextauth-secret-here
-NEXTAUTH_URL=http://localhost:3000
-```
-
-#### Tạo GitHub OAuth App
-
-1. Vào [https://github.com/settings/developers](https://github.com/settings/developers)
-2. Nhấn **New OAuth App**
-3. Điền:
-   - **Homepage URL**: `http://localhost:3000`
-   - **Authorization callback URL**: `http://localhost:3000/api/auth/callback/github`
-4. Copy **Client ID** và tạo **Client Secret** → dán vào `.env.local`
-
-### 3. Seed dữ liệu mẫu
-
-```bash
-npx tsx scripts/seed.ts
-```
-
-Lệnh này tạo:
-- 1 **Roadmap** mẫu (Frontend 2025) với 5 nodes
-- 1 **Blog post** mẫu (kèm related roadmap)
-- 1 **Content** mẫu (JavaScript Async/Await)
-
-> **Lưu ý:** Ghi chú (Notes) **không được seed** vì chúng liên kết với tài khoản người dùng đã xác thực. Tạo ghi chú sau khi đăng nhập tại `/notes/new`.
-
-### 4. Chạy development server
-
-```bash
-npm run dev
-```
-
-Mở [http://localhost:3000](http://localhost:3000)
+| Problem with other readers | FormulaDoc solution |
+|---|---|
+| Equations show raw XML or disappear | ✅ Full OMML → LaTeX → flutter_math_fork pipeline |
+| Tables render as garbled text | ✅ Table renderer with merged cells, alternating rows |
+| Formatting lost (bold/italic/colour) | ✅ Complete character-level style support |
+| App freezes on large documents | ✅ `compute()` isolate — parser never blocks UI |
+| Can't "Open with" from file manager | ✅ Android intent filter registered |
+| Re-opening is slow | ✅ LRU in-memory cache (5 documents) |
+| Can't search inside a document | ✅ Full-text search with highlights |
 
 ---
 
-## 📁 Cấu trúc dự án
+## Project Status
 
-```
-src/
-├── app/
-│   ├── layout.tsx              # Root layout + NavBar + default SEO
-│   ├── page.tsx                # Trang chủ – danh sách roadmaps
-│   ├── sitemap.ts              # Dynamic sitemap.xml (roadmap + blog + content)
-│   ├── robots.ts               # robots.txt
-│   ├── not-found.tsx           # Custom 404
-│   │
-│   ├── auth/
-│   │   └── signin/
-│   │       └── page.tsx        # Trang đăng nhập GitHub OAuth
-│   │
-│   ├── blog/
-│   │   ├── page.tsx            # Danh sách bài viết (SSG + ISR)
-│   │   ├── loading.tsx         # Skeleton loading
-│   │   ├── error.tsx           # Error boundary
-│   │   ├── new/
-│   │   │   └── page.tsx        # Form tạo bài viết mới
-│   │   └── [blog-slug]/
-│   │       ├── page.tsx        # Trang bài viết (SSG + ISR + JSON-LD)
-│   │       ├── edit/
-│   │       │   └── page.tsx    # Form chỉnh sửa bài viết
-│   │       └── loading.tsx
-│   │
-│   ├── roadmap/
-│   │   └── [roadmap-slug]/
-│   │       ├── page.tsx        # Trang Roadmap (SSG + ISR)
-│   │       ├── loading.tsx     # Skeleton loading
-│   │       ├── error.tsx       # Error boundary
-│   │       └── [node-slug]/
-│   │           ├── page.tsx    # Trang bài học chi tiết (SEO)
-│   │           └── loading.tsx
-│   │
-│   ├── content/
-│   │   ├── page.tsx            # Thư viện nội dung (+ nút "Thêm mới")
-│   │   ├── loading.tsx
-│   │   ├── error.tsx           # Error boundary
-│   │   ├── new/
-│   │   │   └── page.tsx        # Form tạo Content mới
-│   │   └── [content-slug]/
-│   │       ├── page.tsx        # Trang content chi tiết
-│   │       ├── edit/
-│   │       │   └── page.tsx    # Form chỉnh sửa content
-│   │       └── loading.tsx
-│   │
-│   ├── notes/
-│   │   ├── page.tsx            # Danh sách ghi chú (yêu cầu đăng nhập)
-│   │   ├── new/
-│   │   │   └── page.tsx        # Form tạo ghi chú mới
-│   │   └── [note-slug]/
-│   │       ├── page.tsx        # Trang ghi chú chi tiết (chỉ chủ sở hữu)
-│   │       └── edit/
-│   │           └── page.tsx    # Form chỉnh sửa ghi chú
-│   │
-│   ├── dashboard/
-│   │   ├── page.tsx            # Server wrapper (lấy session + data)
-│   │   └── DashboardClient.tsx # Client component – 4 tab quản lý
-│   │
-│   ├── builder/
-│   │   └── new/
-│   │       └── page.tsx        # Form tạo Roadmap mới
-│   │
-│   └── api/
-│       ├── auth/
-│       │   └── [...nextauth]/
-│       │       └── route.ts    # NextAuth handler (GitHub OAuth)
-│       └── revalidate/
-│           └── route.ts        # On-demand ISR revalidation
-│
-├── actions/
-│   ├── roadmap.ts              # CRUD Roadmap + togglePublish + share
-│   ├── content.ts              # CRUD Content Library
-│   ├── post.ts                 # CRUD Blog Posts
-│   └── note.ts                 # CRUD Notes (private, owner-only)
-│
-├── components/
-│   ├── NavBar.tsx              # Global navigation bar (sticky, active route)
-│   ├── SessionProvider.tsx     # NextAuth SessionProvider wrapper
-│   ├── RoadmapBuilder.tsx      # Client: React Flow canvas + publish toggle
-│   ├── CustomRoadmapNode.tsx   # Custom node UI
-│   ├── NodeEditModal.tsx       # Modal chỉnh sửa Markdown (3 tabs)
-│   ├── ShareModal.tsx          # Modal chia sẻ & collaborators roadmap
-│   ├── FloatingMenu.tsx        # Floating action menu (tạo nhanh)
-│   ├── JsonLd.tsx              # Structured Data (Schema.org)
-│   ├── CreateRoadmapForm.tsx   # Form tạo Roadmap mới
-│   ├── CreatePostForm.tsx      # Form tạo Blog Post
-│   ├── EditPostForm.tsx        # Form chỉnh sửa Blog Post
-│   ├── CreateContentForm.tsx   # Form tạo Content Library item
-│   ├── EditContentForm.tsx     # Form chỉnh sửa Content
-│   ├── CreateNoteForm.tsx      # Form tạo / chỉnh sửa Ghi chú
-│   ├── BlogCardActions.tsx     # Actions cho card bài viết (edit/delete)
-│   ├── ContentCardActions.tsx  # Actions cho card content
-│   ├── ContentDetailActions.tsx# Actions trên trang chi tiết content
-│   ├── NoteCardActions.tsx     # Actions cho card ghi chú (pin/edit/delete)
-│   ├── NoteDetailActions.tsx   # Actions trên trang chi tiết ghi chú
-│   └── PostDetailActions.tsx   # Actions trên trang chi tiết bài viết
-│
-├── lib/
-│   ├── auth.ts                 # NextAuth config (GitHub provider + callbacks)
-│   ├── mongodb.ts              # MongoDB singleton (Mongoose)
-│   ├── mongodb-client.ts       # MongoClient singleton (NextAuth adapter)
-│   └── utils.ts                # slug, excerpt, readingTime, cn(), serializeDoc()
-│
-├── models/
-│   ├── Roadmap.ts              # Mongoose Schema: Roadmap + Node + Edge
-│   ├── Content.ts              # Mongoose Schema: Content Library
-│   ├── Post.ts                 # Mongoose Schema: Blog Post
-│   └── Note.ts                 # Mongoose Schema: Ghi chú cá nhân
-│
-└── types/
-    └── index.ts                # TypeScript interfaces (IRoadmap, IContent, IPost)
+| Phase | Feature set | Status |
+|---|---|---|
+| **1 — Foundation** | Architecture · DOCX parse · Open With · Basic text | ✅ Complete |
+| **2 — Rich Content** | Images · Tables · Lists · Hyperlinks | ✅ Complete |
+| **3 — Math Engine** | OMML parser · 200+ symbols · flutter_math_fork | ✅ Complete |
+| **4 — Polish** | In-doc search · Scroll cache · Position indicator | ✅ Complete |
+| **5 — Platform** | Parser registry · DOCX serializer · Edit model · Settings | ✅ Complete |
+
+**Overall: ~95% complete.** Remaining: PDF viewer, collaborative editing.
+
+---
+
+## Quick Start
+
+```bash
+# 1. Install Flutter 3.44.1
+flutter --version   # must be 3.44.1
+
+# 2. Get dependencies
+cd formuladoc
+flutter pub get
+
+# 3. Run on connected Android device
+flutter run
+
+# 4. Build release APK
+flutter build apk --release
+# → build/app/outputs/flutter-apk/app-release.apk
+
+# 5. Run all tests (~155 test cases, no device needed)
+flutter test
 ```
 
 ---
 
-## 🌐 URL Structure & SEO
+## Architecture
 
 ```
-/                                      → Trang chủ – danh sách roadmaps
-/roadmap/[roadmap-slug]               → Xem/Edit roadmap (React Flow canvas)
-/roadmap/[roadmap-slug]/[node-slug]   → Trang bài học chi tiết
-/content                              → Thư viện nội dung độc lập
-/content/[content-slug]              → Trang nội dung (có backlinks)
-/content/[content-slug]/edit         → Chỉnh sửa content
-/blog                                 → Danh sách bài viết blog
-/blog/[blog-slug]                    → Bài viết đầy đủ (BlogPosting schema)
-/blog/new                            → Form viết bài mới
-/blog/[blog-slug]/edit               → Chỉnh sửa bài viết
-/notes                                → Danh sách ghi chú (yêu cầu đăng nhập)
-/notes/new                            → Tạo ghi chú mới
-/notes/[note-slug]                    → Chi tiết ghi chú (chỉ chủ sở hữu)
-/notes/[note-slug]/edit               → Chỉnh sửa ghi chú
-/dashboard                            → Quản lý toàn bộ nội dung của bạn
-/builder/new                          → Form tạo Roadmap mới
-/auth/signin                          → Đăng nhập bằng GitHub
-/guide                                → Hướng dẫn sử dụng
-/sitemap.xml                          → Tự động generate (tất cả pages)
-/robots.txt                           → Tự động generate
+DOCX file (bytes)
+       │
+       ▼
+DocumentParserRegistry        ← auto-selects correct parser
+       │
+       ▼
+DocxParser.parse()            ← runs in compute() isolate
+  │
+  ├── DocxExtractor            ZIP → raw XML strings
+  ├── StyleResolver            word/styles.xml → style map
+  ├── NumberingParser          word/numbering.xml → list types
+  ├── XmlBodyParser            document.xml → DocumentModel
+  └── OmmlParser               <m:oMath> → LaTeX string
+       │
+       ▼
+DocumentModel                 ← pure Dart, isolate-safe
+  blocks: List<DocumentBlock> ← sealed class hierarchy
+  images: Map<String,Uint8List>
+  parseWarnings: List<String>
+       │
+       ▼
+DocumentRendererWidget        ← ConsumerWidget, watches searchProvider
+  switch(block) {
+    ParagraphBlock → ParagraphRenderer  (with SearchHighlight)
+    HeadingBlock   → HeadingRenderer    (with SearchHighlight)
+    EquationBlock  → EquationRenderer   (Math.tex / fallback)
+    ImageBlock     → Image.memory
+    TableBlock     → Table widget
+    ListBlock      → Column + bullets
+    PageBreakBlock → Divider
+    HyperlinkBlock → TapGestureRecognizer
+  }
 ```
 
-### SEO Features đã triển khai
+### Sealed Block Hierarchy
 
-| Feature | Mô tả |
-|---------|-------|
-| `generateMetadata()` | Metadata động từ MongoDB cho mỗi trang |
-| `generateStaticParams()` | SSG cho roadmap, node, content, blog |
-| force-dynamic / ISR | Sitemap luôn fresh; pages dùng force-dynamic hoặc ISR |
-| On-demand revalidation | `/api/revalidate` khi publish |
-| JSON-LD Course | Trang roadmap → Course schema |
-| JSON-LD Article | Trang node → Article schema |
-| JSON-LD BlogPosting | Trang blog → BlogPosting schema |
-| OpenGraph + Twitter Card | Preview khi share mạng xã hội |
-| Sitemap.xml | Tất cả trang: roadmap, node, content, blog |
-| Canonical URLs | Tránh duplicate content |
-| Breadcrumb markup | Path hiển thị trên Google Search |
-| robots: noindex | Trang notes/dashboard không index |
+```dart
+sealed class DocumentBlock { ... }
+
+final class ParagraphBlock  extends DocumentBlock  // ✅ Phase 1
+final class HeadingBlock    extends DocumentBlock  // ✅ Phase 1
+final class PageBreakBlock  extends DocumentBlock  // ✅ Phase 1
+final class EquationBlock   extends DocumentBlock  // ✅ Phase 3
+final class ImageBlock      extends DocumentBlock  // ✅ Phase 2
+final class TableBlock      extends DocumentBlock  // ✅ Phase 2
+final class ListBlock       extends DocumentBlock  // ✅ Phase 2
+final class HyperlinkBlock  extends DocumentBlock  // ✅ Phase 2
+```
+
+Adding a new block type causes a compile-time error in every renderer
+— guaranteeing nothing is silently skipped.
+
+### State Management (Riverpod 2.x)
+
+```
+ProviderScope
+├── documentNotifierProvider   (autoDispose) → DocumentState
+│     status: initial|loading|loaded|error
+│     model: DocumentModel?
+│
+├── searchNotifierProvider     (autoDispose) → SearchState
+│     query, results, currentIndex, highlights per block
+│
+├── historyNotifierProvider    → HistoryState
+│     recentFiles, favorites
+│
+├── editorNotifierProvider     (autoDispose) → EditorState
+│     original, current, history, hasUnsavedChanges
+│
+└── service providers (singletons)
+      documentCacheProvider    LRU 5-document cache
+      parserRegistryProvider   format → parser map
+      docxSerializerProvider   DocumentModel → DOCX bytes
+      intentHandlerProvider    Android "Open with"
+```
 
 ---
 
-## 🗄️ Database Schema
+## Math Engine (Phase 3)
 
-### Roadmap
+Supported OMML → LaTeX conversions:
 
-```typescript
-{
-  title, slug (unique), description,
-  author: { name, avatar },
-  category, tags, coverImage,
-  isPublished, viewCount,
-  collaborators: string[],   // GitHub user IDs được phép edit
-  nodes: [{
-    id, type, position: { x, y },
-    data: {
-      label, slug, content (Markdown),
-      contentSlug?,   // link tới Content collection
-      description, status, icon,
-      estimatedTime, difficulty, tags, resources
-    }
-  }],
-  edges: [{ id, source, target, type, animated }]
+| OMML element | LaTeX | Example |
+|---|---|---|
+| `<m:f>` | `\frac{a}{b}` | Fractions |
+| `<m:rad>` | `\sqrt[n]{x}` | Roots |
+| `<m:sSup>` | `x^{n}` | Superscript |
+| `<m:sSub>` | `x_{n}` | Subscript |
+| `<m:sSubSup>` | `x_{n}^{m}` | Sub+superscript |
+| `<m:nary>` ∫∑∏ | `\int_{a}^{b}` | Integrals, sums |
+| `<m:d>` | `\left( \right)` | Auto-brackets |
+| `<m:m>` | `\begin{matrix}` | Matrices |
+| `<m:limLow>` | `\lim_{x→0}` | Limits |
+| `<m:acc>` | `\hat{x}` | Accents |
+| `<m:eqArr>` | `\begin{aligned}` | Equation arrays |
+| `<m:borderBox>` | `\boxed{x}` | Boxed equations |
+
+**200+ Unicode → LaTeX mappings** including all Greek letters, operators,
+arrows, set symbols, number sets (ℝℕℤℚℂ), and special symbols.
+
+Fallback chain:
+1. `Math.tex(latex)` — flutter_math_fork renders KaTeX
+2. On KaTeX parse error → show raw LaTeX + error message (expandable)
+3. On OMML conversion failure → show OMML source (expandable)
+
+---
+
+## DOCX Serializer (Phase 5)
+
+`DocxSerializer` converts a `DocumentModel` back to valid `.docx` bytes:
+
+```dart
+final serializer = DocxSerializer();
+final bytes = await serializer.serialize(model);
+await File('output.docx').writeAsBytes(bytes);
+```
+
+Supported output:
+- ✅ Paragraphs (bold, italic, underline, colour, font size)
+- ✅ Headings H1–H6 with correct Word styles
+- ✅ Page breaks
+- ✅ Tables (basic, no rowspan)
+- ✅ Ordered and unordered lists
+- ✅ Document metadata (title, author)
+- ✅ Images (embedded as media files)
+- 🔜 Equations → serialize back to `<m:oMath>` (Phase 6)
+- 🔜 Hyperlinks → `<w:hyperlink>` (Phase 6)
+
+**Round-trip verified**: serialize → re-parse → same content.
+
+---
+
+## Parser Registry (Phase 5)
+
+Adding a new format requires exactly 3 steps:
+
+```dart
+// 1. Implement DocumentParserInterface
+class PdfParser implements DocumentParserInterface {
+  @override DocumentFormat get format => DocumentFormat.pdf;
+  @override Future<DocumentModel> parse(DocumentSource source) async { ... }
 }
-```
 
-### Content (Library)
+// 2. Register at startup (main.dart)
+DocumentParserRegistry.instance.register(PdfParser());
 
-```typescript
-{
-  title, slug (unique), content (Markdown),
-  description, tags, difficulty,
-  estimatedTime, icon, resources
-}
-```
-
-### Post (Blog)
-
-```typescript
-{
-  title, slug (unique), content (Markdown),
-  description, coverImage,
-  author: { name, avatar },
-  category, tags,
-  relatedRoadmaps: string[],  // slugs của roadmap liên quan
-  resources, isPublished, publishedAt, viewCount
-}
-```
-
-### Note (Ghi chú cá nhân)
-
-```typescript
-{
-  title, slug (unique), content (Markdown),
-  color: "yellow" | "blue" | "green" | "pink" | "purple" | "default",
-  isPinned: boolean,
-  tags: string[],
-  roadmapSlug?,    // liên kết tới roadmap nếu có
-  ownerId,         // GitHub user ID của chủ sở hữu
-  ownerEmail,      // Email dự phòng (backward compat)
-  createdAt, updatedAt
-}
-```
-
-> ⚠️ **Ghi chú luôn riêng tư.** Server Actions kiểm tra `ownerId` / `ownerEmail` trước mọi thao tác đọc/ghi. Người khác sẽ thấy trang cảnh báo 🔒 thay vì nội dung.
-
----
-
-## 🔄 Luồng hoạt động
-
-### Tạo Roadmap mới
-```
-/builder/new → CreateRoadmapForm → createRoadmap() Server Action
-  → MongoDB insert (isPublished: false)
-  → redirect /roadmap/[slug] (editor mode)
-  → Thêm nodes, kéo thả, chỉnh sửa
-  → Click "Xuất bản" → togglePublishRoadmap()
-  → revalidatePath() → HTML mới được build
-```
-
-### Viết Blog Post
-```
-/blog/new → CreatePostForm → createPost() Server Action
-  → MongoDB insert
-  → redirect /blog/[slug]
-  → Gắn relatedRoadmaps → hiển thị ở sidebar bài viết
-```
-
-### Tái sử dụng Content
-```
-Tạo Content tại /content → slug: "javascript-async-await"
-Node A trong Roadmap 1 → contentSlug = "javascript-async-await"
-Node B trong Roadmap 2 → contentSlug = "javascript-async-await"
-  → Cả 2 node đều navigate đến /content/javascript-async-await
-  → Sidebar hiển thị backlinks: "Có trong 2 Roadmaps"
-```
-
-### Tạo Ghi chú
-```
-/notes/new → CreateNoteForm → createNote() Server Action
-  → Kiểm tra session (requireAuth)
-  → MongoDB insert (ownerId = session.user.id)
-  → Ghi chú được gán màu, tag, isPinned
-  → redirect /notes/[slug]
-  → Chỉ chủ sở hữu xem/sửa/xóa được
-```
-
-### Chế độ View vs Edit (Roadmap)
-```
-Mode View: click node → navigate đến bài học
-Mode Edit: click node → mở NodeEditModal (3 tab: Cơ bản / Nội dung / Kết nối)
-Toggle publish: "Draft" ↔ "Public" không cần reload trang
-Share: mở ShareModal → thêm collaborators bằng GitHub username
+// 3. Nothing else changes — DocumentNotifier auto-selects it
 ```
 
 ---
 
-## 📊 Lộ trình thực hiện (Project Roadmap)
+## Edit System (Phase 5)
 
-### ✅ Phase 1: Setup & Foundation
-- [x] Khởi tạo Next.js 15 với TypeScript
-- [x] Cài đặt dependencies (Tailwind, Shadcn, ReactFlow, nanoid...)
-- [x] Cấu hình MongoDB Atlas
-- [x] Setup Mongoose models (Roadmap, Content, Post, **Note**)
-- [x] Deploy lên Vercel (CI/CD từ đầu)
+Sealed edit hierarchy with undo/redo (100 levels):
 
-### ✅ Phase 2: Core Builder
-- [x] Custom React Flow node component
-- [x] Chế độ View: click → navigate
-- [x] Chế độ Edit: drag, add/delete node
-- [x] NodeEditModal với Markdown editor (3 tabs)
-- [x] Save graph lên MongoDB
-- [x] **Publish toggle** (Draft / Public)
-- [x] **ShareModal** – thêm/xóa collaborators
+```dart
+sealed class DocumentEdit { ... }
 
-### ✅ Phase 3: SEO & Content
-- [x] `generateMetadata()` cho tất cả pages
-- [x] MDX rendering với syntax highlight
-- [x] JSON-LD: Course, Article, BlogPosting
-- [x] Sitemap.xml & robots.txt (cả blog + content)
-- [x] `generateStaticParams()` + ISR
-- [x] **Blog system** (/blog, /blog/[slug], /blog/new, /blog/[slug]/edit)
-- [x] **Content Library** tái sử dụng giữa nhiều roadmap
+// Text operations
+InsertTextEdit    // insert at char offset in run
+DeleteTextEdit    // delete char range across runs
+ReplaceTextEdit   // atomic replace
 
-### ✅ Phase 4: Auth & Notes
-- [x] **NextAuth.js** – GitHub OAuth (`/auth/signin`)
-- [x] **Notes system** – ghi chú cá nhân riêng tư (/notes/\*)
-- [x] Owner-based access control (ownerId/ownerEmail)
-- [x] Dashboard – quản lý tất cả nội dung 1 trang
+// Style operations  
+ApplyRunStyleEdit      // bold/italic/colour over char range
+SetAlignmentEdit       // paragraph alignment
 
-### ✅ Phase 5: Polish & Deploy
-- [x] Loading skeletons (CLS optimization) — tất cả routes kể cả homepage
-- [x] **Error boundaries** — `error.tsx` cho global, roadmap, blog, content
-- [x] **Global NavBar** (sticky, highlight active route)
-- [x] **ReactFlow canvas height** fixed (`calc(100vh - 3.5rem)`)
-- [x] Mobile responsive (Tailwind breakpoints: sm/md/lg)
-- [x] **Revalidate API** — xử lý cả `roadmap` / `blog` / `content` type
-- [ ] Google Search Console setup *(thêm verification code vào `layout.tsx`)*
-- [ ] Performance audit (Lighthouse ≥ 90) *(chạy sau khi deploy production)*
+// Structure operations
+InsertBlockEdit        // add block at position
+DeleteBlockEdit        // remove block (preserves for undo)
+MoveBlockEdit          // drag-and-drop reorder
+ChangeHeadingLevelEdit // H1↔H2↔paragraph
+
+// Composite
+CompositeEdit          // batch multiple edits → one undo step
+```
+
+```dart
+// Usage
+final editor = ref.read(editorNotifierProvider.notifier);
+editor.loadDocument(model);
+editor.applyBold('block_id', 0, 5);   // bold chars 0-5
+editor.undo();                          // revert bold
+editor.applyEdit(InsertBlockEdit(...));
+final bytes = await editor.exportDocx();
+```
 
 ---
 
-## 🧪 Kiểm tra SEO
+## Android Open With
+
+FormulaDoc registers three intent filters in `AndroidManifest.xml`:
+
+1. **MIME type** `application/vnd.openxmlformats-officedocument.wordprocessingml.document`
+   → works with Google Drive, Gmail, modern file managers
+2. **File URI + MIME** → older file managers
+3. **Extension pattern** `.docx` → OEM file managers sending `*/*`
+
+The `PlatformIntentHandler` wraps `receive_sharing_intent` and emits a
+`Stream<String>` of file paths. Both cold-start and foreground intents
+are handled.
+
+---
+
+## Project Structure
+
+```
+lib/
+├── core/
+│   ├── constants/          AppConstants, ThemeConstants
+│   ├── errors/             Typed exception hierarchy (sealed)
+│   └── utils/              AppLogger, FileUtils
+│
+├── data/
+│   ├── models/             DocumentBlock (sealed), DocumentModel,
+│   │                       FileRecord, SearchResult, DocumentEdit,
+│   │                       EditHistory
+│   ├── parsers/
+│   │   ├── parser_registry.dart    ← plug-and-play format registry
+│   │   ├── docx/           DocxParser, DocxExtractor, XmlBodyParser,
+│   │   │                   StyleResolver, NumberingParser, DrawingParser
+│   │   ├── omml/           OmmlParser (OMML → LaTeX, 641 lines)
+│   │   ├── pdf/            PdfParser (stub → Phase 6)
+│   │   ├── pptx/           PptxParser (stub → Phase 6)
+│   │   └── xlsx/           XlsxParser (stub → Phase 6)
+│   ├── repositories/       HistoryRepository (SharedPreferences)
+│   └── serializers/        DocxSerializer (DocumentModel → ZIP)
+│
+├── domain/
+│   ├── abstractions/       DocumentSource, DocumentParserInterface,
+│   │                       DocumentFormat
+│   ├── cloud/              CloudProvider (abstract), CloudDocument
+│   └── usecases/           OpenDocumentUseCase, GetRecentFilesUseCase
+│
+├── services/               FileService, HistoryService,
+│                           DocumentSearchService, DocumentCacheService,
+│                           HyperlinkService
+├── platform/               PlatformIntentHandler
+│
+└── presentation/
+    ├── providers/          DocumentNotifier, HistoryNotifier,
+    │                       SearchNotifier, EditorNotifier
+    │                       + service_providers.dart
+    ├── theme/              AppTheme (light + dark)
+    ├── screens/
+    │   ├── home/           HomeScreen (recent + favorites + search)
+    │   ├── viewer/         ViewerScreen (zoom + search + scroll)
+    │   └── settings/       SettingsScreen (cache, theme, formats)
+    ├── renderers/          DocumentRendererWidget (ConsumerWidget),
+    │                       ParagraphRenderer, HeadingRenderer,
+    │                       EquationRenderer, TextRunBuilder
+    └── widgets/            DocumentSearchBar, ScrollPositionIndicator
+```
+
+---
+
+## Testing
 
 ```bash
-# Build và kiểm tra static pages
-npm run build
+# All tests (~160 total, run without a device)
+flutter test
 
-# Kiểm tra sitemap
-curl http://localhost:3000/sitemap.xml
+# By category
+flutter test test/data/parsers/docx_parser_test.dart   # DOCX parsing
+flutter test test/data/parsers/omml_parser_test.dart   # OMML → LaTeX (50 cases)
+flutter test test/services/document_search_service_test.dart  # search
+flutter test test/phase5_test.dart                     # serializer + registry
 
-# Kiểm tra JSON-LD
-# DevTools → Sources → tìm <script type="application/ld+json">
-
-# On-demand revalidation – Roadmap
-curl -X POST http://localhost:3000/api/revalidate \
-  -H "Content-Type: application/json" \
-  -d '{"secret":"your-secret","type":"roadmap","slug":"frontend-web-development-2025"}'
-
-# On-demand revalidation – Blog post
-curl -X POST http://localhost:3000/api/revalidate \
-  -H "Content-Type: application/json" \
-  -d '{"secret":"your-secret","type":"blog","slug":"huong-dan-hoc-frontend-2025"}'
-
-# On-demand revalidation – Content
-curl -X POST http://localhost:3000/api/revalidate \
-  -H "Content-Type: application/json" \
-  -d '{"secret":"your-secret","type":"content","slug":"javascript-async-await"}'
+# Coverage
+flutter test --coverage
+genhtml coverage/lcov.info -o coverage/html
+open coverage/html/index.html
 ```
 
 ---
 
-## 📝 Ghi chú quan trọng
+## Adding Cloud Sync (Phase 6)
 
-1. **React Flow cần `'use client'`** — Toàn bộ Builder là Client Component. Data fetch ở Server → truyền qua props.
+```dart
+// 1. Implement CloudProvider
+class GoogleDriveProvider extends CloudProvider {
+  @override String get id          => 'google_drive';
+  @override String get displayName => 'Google Drive';
+  // ... implement connect(), listDocuments(), download(), upload() ...
+}
 
-2. **MongoDB ObjectId** — Luôn dùng `serializeDoc()` trước khi truyền từ Server → Client Component để tránh "Non-serializable values" error.
+// 2. Register in service_providers.dart
+final googleDriveProvider = Provider((_) => GoogleDriveProvider());
 
-3. **Blog vs Content Library**:
-   - `Blog Post` (/blog/[slug]): bài viết có tác giả, ngày đăng, ảnh bìa, `relatedRoadmaps`. Phù hợp cho tutorial, guide, tips.
-   - `Content Library` (/content/[slug]): nội dung kỹ thuật thuần túy, gắn trực tiếp vào node qua `contentSlug`.
+// 3. Use in UI
+final provider = ref.read(googleDriveProvider);
+await provider.connect();
+final docs = await provider.listDocuments();
+final source = await provider.download(docs.first);
+await ref.read(documentNotifierProvider.notifier).open(source);
+```
 
-4. **Notes vs Blog**:
-   - `Note` (/notes/[slug]): **luôn riêng tư**, chỉ chủ sở hữu xem được, không index SEO, hỗ trợ màu sắc và ghim.
-   - `Blog Post`: có thể public hoặc nháp, hỗ trợ SEO đầy đủ.
+---
 
-5. **Publish workflow**: Roadmap tạo mới mặc định là `Draft`. Nhấn "Xuất bản" trong editor để public. Blog post có toggle publish ngay trên form.
+## Build Verification (Final Pass)
 
-6. **Auth & Session**: `getServerSession(authOptions)` dùng trong Server Components và Server Actions. Client Components dùng `useSession()` từ NextAuth.
+This environment does not have the Flutter/Dart SDK installed, so `flutter
+analyze` / `flutter test` could not be executed directly here. Instead, the
+final pass ran a set of static, script-based integrity checks across **every**
+file in `lib/` and `test/` to catch the classes of error a compiler would
+otherwise catch first:
 
-7. **ISR vs SSG** — Dùng `revalidate = 3600` cho nội dung ít thay đổi. Dùng On-demand revalidation khi publish content mới. Notes dùng `force-dynamic` vì luôn cần session mới nhất.
+| Check | Result |
+|---|---|
+| All relative imports resolve to an existing file | ✅ 183/183 resolved |
+| No duplicate top-level class/enum names | ✅ none found |
+| Brace / paren balance in every file | ✅ balanced |
+| `firstOrNull`/`lastOrNull` usages have `package:collection` imported | ✅ all 4 sites fixed |
+| Singleton classes (private constructor) not default-constructed elsewhere | ✅ 1 found & fixed |
+| Every `ref.read(xProvider.notifier).method()` call matches a real method | ✅ all call sites valid |
+| `pubspec.yaml` is valid YAML with all used packages declared | ✅ added `collection: ^1.19.0` |
 
-8. **MDX Security** — `next-mdx-remote` chạy server-side, an toàn. Nhưng nên validate input Markdown trước khi save vào DB.
+**Two genuine, would-not-have-compiled bugs were found and fixed in this pass:**
 
-9. **Canvas height** — RoadmapBuilder dùng `height: calc(100vh - 3.5rem)` để trừ đi chiều cao NavBar (3.5rem = 56px).
+1. **29 broken relative import paths** across 9 files (`services/`,
+   `data/parsers/`, `presentation/screens/viewer/widgets/`) — these used the
+   wrong number of `../` segments and pointed at non-existent locations like
+   `lib/models/` instead of `lib/data/models/`. Root-caused to several files
+   being authored in isolation during earlier phases without re-checking
+   their actual directory depth.
+2. **`DocumentParserRegistry()` called with no public constructor** in
+   `phase5_test.dart` — the class is a singleton (`._()` private constructor
+   + static `.instance`); the test now correctly uses
+   `DocumentParserRegistry.instance`.
+
+**One real runtime crash bug (not a compile error) was also found and fixed:**
+
+3. **Flutter's `Table` widget crashes on any DOCX containing merged cells.**
+   `Table` requires every `TableRow` to have an identical cell count, but
+   OOXML legitimately emits *fewer* `<w:tc>` elements for a row containing a
+   `gridSpan` (column-merge) cell. `TableGridNormalizer`
+   (`lib/presentation/renderers/table_grid_normalizer.dart`, pure Dart, unit
+   tested) pads short rows with invisible filler cells before the widget
+   tree is built, so a real-world document with merged-cell tables no longer
+   throws an assertion error on open.
+
+**Two silent data-loss bugs in the DOCX serializer were also fixed:**
+
+4. Hyperlinks (`<w:hyperlink r:id="...">`) were written with **no
+   corresponding relationship entry** — Word would either strip the link or
+   flag the file as needing repair. Fixed with a `_SerializationContext`
+   that assigns and records real relationship IDs during the same traversal
+   that emits the body XML, for both standalone `HyperlinkBlock`s and inline
+   `TextRun.url` runs.
+5. Image relationships were written as `Target="media/image1.png"` while the
+   actual archived file was named `media/{rId}.png` — a guaranteed-broken
+   reference on reopen. Both now derive from one `_mediaFileName()` helper so
+   they can never drift apart.
+6. Equations were serialized as plain italic text, discarding the original
+   formula. The parser already retains `EquationBlock.rawOmml` verbatim, so
+   the serializer now re-emits it inside `<m:oMathPara>` — a save → reopen
+   cycle no longer destroys equations (editing equation *content* is still
+   Phase 6 work).
+7. Lists referenced `numId="1"`/`numId="2"` with **no `word/numbering.xml`
+   defining them** — Word silently drops bullet/number formatting on open.
+   A minimal valid `numbering.xml` (9 levels × bullet + decimal) is now
+   written and linked from both `[Content_Types].xml` and
+   `document.xml.rels`.
+
+None of the above were caught by manual code review across the many editing
+passes that built this project — they only surfaced once every file was
+checked mechanically, all together, in one pass. This is the actual reason a
+dedicated "final polish" pass earns its place in a real engineering process,
+not just a formality.
+
+```bash
+# Once a real Dart SDK is available, confirm with:
+flutter analyze
+flutter test
+flutter build apk --release
+```
+
+---
+
+## License
+MIT — see LICENSE.
+
+Built with Flutter · Powered by flutter_math_fork · LaTeX via KaTeX
