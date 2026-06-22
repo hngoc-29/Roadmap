@@ -283,7 +283,6 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
       transformationController: _transformController,
       minScale:     AppConstants.minZoom,
       maxScale:     AppConstants.maxZoom,
-      constrained:  false,
       onInteractionUpdate: (_) {
         final scale = _transformController.value.getMaxScaleOnAxis();
         if ((scale - _currentZoom).abs() > 0.01) {
@@ -291,7 +290,8 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
         }
       },
       child: SizedBox(
-        width: MediaQuery.of(context).size.width,
+        width:  MediaQuery.of(context).size.width,
+        height: MediaQuery.of(context).size.height,
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: AppConstants.documentMaxWidth),
@@ -300,9 +300,9 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
                   ? ThemeConstants.paperDark
                   : ThemeConstants.paperLight,
               child: DocumentRendererWidget(
-                model:          state.model!,
+                model:            state.model!,
                 scrollController: _scrollController,
-                onLinkTap:      _handleLinkTap,
+                onLinkTap:        _handleLinkTap,
               ),
             ),
           ),
