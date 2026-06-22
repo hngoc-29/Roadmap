@@ -5,7 +5,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/constants/app_constants.dart';
 import 'data/parsers/parser_registry.dart';
-import 'presentation/providers/document_provider.dart';
 import 'presentation/providers/service_providers.dart';
 import 'presentation/screens/home/home_screen.dart';
 import 'presentation/screens/viewer/viewer_screen.dart';
@@ -64,13 +63,17 @@ class _FormulaDocAppState extends ConsumerState<FormulaDocApp> {
 
     try {
       final handler = ref.read(intentHandlerProvider);
-      await handler.initialize();
 
+      // Subscribe BEFORE initialize() so cold-start paths emitted during
+      // getInitialMedia() are not lost (broadcast stream drops events
+      // with no listeners).
       _intentSub = handler.fileStream.listen(
         _handleIncomingFile,
         onError: (Object e) =>
             debugPrint('[FormulaDocApp] Intent stream error: $e'),
       );
+
+      await handler.initialize();
     } catch (e) {
       debugPrint('[FormulaDocApp] Intent handler init failed: $e');
     }
@@ -81,10 +84,12 @@ class _FormulaDocAppState extends ConsumerState<FormulaDocApp> {
     final navigator = _navigatorKey.currentState;
     if (navigator == null) return;
 
-    ref.read(documentNotifierProvider.notifier).openFromPath(path);
-
+    // Pass path directly to ViewerScreen so it loads via its own notifier
+    // instance (documentNotifierProvider is autoDispose — calling openFromPath
+    // on a separate read would create a provider that gets disposed before
+    // ViewerScreen subscribes to it).
     navigator.pushAndRemoveUntil(
-      MaterialPageRoute<void>(builder: (_) => const ViewerScreen()),
+      MaterialPageRoute<void>(builder: (_) => ViewerScreen.fromPath(path)),
       (route) => route.isFirst,
     );
   }

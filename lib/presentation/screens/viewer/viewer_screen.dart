@@ -281,8 +281,9 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
   Widget _buildDocumentView(BuildContext context, DocumentState state) {
     return InteractiveViewer(
       transformationController: _transformController,
-      minScale:     AppConstants.minZoom,
-      maxScale:     AppConstants.maxZoom,
+      minScale:    AppConstants.minZoom,
+      maxScale:    AppConstants.maxZoom,
+      panEnabled:  false,   // let inner scrollables handle their own panning
       onInteractionUpdate: (_) {
         final scale = _transformController.value.getMaxScaleOnAxis();
         if ((scale - _currentZoom).abs() > 0.01) {

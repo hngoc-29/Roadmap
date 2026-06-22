@@ -40,6 +40,7 @@ class TextRunBuilder {
     void Function(String url)? onLinkTap,
   }) {
     final baseColor    = Theme.of(context).colorScheme.onSurface;
+    final isDark       = Theme.of(context).brightness == Brightness.dark;
     final baseFontSize = defaultStyle?.fontSize ?? 16.0;
     final spans        = <InlineSpan>[];
     int   charOffset   = 0; // running position through all runs
@@ -57,6 +58,7 @@ class TextRunBuilder {
           run,
           baseColor:    baseColor,
           baseFontSize: baseFontSize,
+          isDark:       isDark,
           onLinkTap:    onLinkTap,
         ));
       } else {
@@ -66,6 +68,7 @@ class TextRunBuilder {
           highlights:   overlapping,
           baseColor:    baseColor,
           baseFontSize: baseFontSize,
+          isDark:       isDark,
           onLinkTap:    onLinkTap,
         ));
       }
@@ -82,9 +85,10 @@ class TextRunBuilder {
     TextRun run, {
     required Color  baseColor,
     required double baseFontSize,
+    required bool   isDark,
     void Function(String url)? onLinkTap,
   }) {
-    final style = _buildStyle(run.style, baseColor, baseFontSize);
+    final style = _buildStyle(run.style, baseColor, baseFontSize, isDark: isDark);
 
     if (run.style.superscript || run.style.subscript) {
       return _scriptSpan(run, style, run.style.fontSizePt ?? baseFontSize);
@@ -109,10 +113,11 @@ class TextRunBuilder {
     required List<SearchHighlight> highlights,
     required Color                baseColor,
     required double               baseFontSize,
+    required bool                 isDark,
     void Function(String url)?    onLinkTap,
   }) {
     final text   = run.text;
-    final base   = _buildStyle(run.style, baseColor, baseFontSize);
+    final base   = _buildStyle(run.style, baseColor, baseFontSize, isDark: isDark);
     final result = <InlineSpan>[];
 
     // Convert to run-local offsets and sort
@@ -176,9 +181,24 @@ class TextRunBuilder {
   static TextStyle _buildStyle(
     TextRunStyle style,
     Color        baseColor,
-    double       baseFontSize,
-  ) {
-    final color    = style.colorArgb != null ? Color(style.colorArgb!) : baseColor;
+    double       baseFontSize, {
+    bool isDark = false,
+  }) {
+    // Adapt the document's explicit color so it stays readable.
+    // DOCX files often hardcode black (0xFF000000) or white text. In dark mode
+    // that means near-invisible black on 0xFF1E1E1E; in light mode near-
+    // invisible white on 0xFFFAFAFA. Fall back to the theme's onSurface color
+    // when the document color would be illegible.
+    Color color = baseColor;
+    if (style.colorArgb != null) {
+      final docColor  = Color(style.colorArgb!);
+      final luminance = docColor.computeLuminance();
+      final isLegible = isDark
+          ? luminance >= 0.15  // dark bg  → need bright-enough text
+          : luminance <= 0.85; // light bg → need dark-enough text
+      color = isLegible ? docColor : baseColor;
+    }
+
     final hlt      = style.highlightArgb != null ? Color(style.highlightArgb!) : null;
     final fontSize = style.fontSizePt != null
         ? (style.fontSizePt! * 1.333).clamp(8.0, 72.0)
