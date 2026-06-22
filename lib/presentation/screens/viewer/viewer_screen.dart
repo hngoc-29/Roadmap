@@ -12,6 +12,7 @@ import '../../providers/history_provider.dart';
 import '../../providers/search_provider.dart';
 import '../../providers/service_providers.dart';
 import '../../renderers/document_renderer_widget.dart';
+import '../../theme/app_theme.dart';
 import '../../widgets/document_search_bar.dart';
 import '../../widgets/scroll_position_indicator.dart';
 import 'widgets/viewer_error_widget.dart';
@@ -283,7 +284,7 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
       transformationController: _transformController,
       minScale:    AppConstants.minZoom,
       maxScale:    AppConstants.maxZoom,
-      panEnabled:  false,   // let inner scrollables handle their own panning
+      panEnabled:  false,
       onInteractionUpdate: (_) {
         final scale = _transformController.value.getMaxScaleOnAxis();
         if ((scale - _currentZoom).abs() > 0.01) {
@@ -291,19 +292,22 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
         }
       },
       child: SizedBox(
-        width:  MediaQuery.of(context).size.width,
-        height: MediaQuery.of(context).size.height,
+        width: MediaQuery.of(context).size.width,
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: AppConstants.documentMaxWidth),
-            child: Container(
-              color: Theme.of(context).brightness == Brightness.dark
-                  ? ThemeConstants.paperDark
-                  : ThemeConstants.paperLight,
-              child: DocumentRendererWidget(
-                model:            state.model!,
-                scrollController: _scrollController,
-                onLinkTap:        _handleLinkTap,
+            // Force light theme: documents are designed for white paper.
+            // Dark mode should only affect app chrome (AppBar, Home, etc.),
+            // not document content which has its own hardcoded colors.
+            child: Theme(
+              data: AppTheme.light,
+              child: Container(
+                color: ThemeConstants.paperLight,
+                child: DocumentRendererWidget(
+                  model:            state.model!,
+                  scrollController: _scrollController,
+                  onLinkTap:        _handleLinkTap,
+                ),
               ),
             ),
           ),

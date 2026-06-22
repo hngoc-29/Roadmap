@@ -208,28 +208,38 @@ class _TableWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     if (block.rows.isEmpty) return const SizedBox.shrink();
 
-    final isDark      = Theme.of(context).brightness == Brightness.dark;
-    final borderColor = isDark ? const Color(0xFF3A3A3A) : const Color(0xFFCCCCCC);
-    final headerBg    = isDark ? const Color(0xFF1A2340) : const Color(0xFFE3F2FD);
-    final altBg       = isDark ? const Color(0xFF1E2024) : const Color(0xFFF9F9F9);
+    // Since the document area is always forced to light theme (white paper),
+    // we use fixed light-mode colors here.
+    const borderColor = Color(0xFFCCCCCC);
+    const headerBg    = Color(0xFFE3F2FD);
+    const altBg       = Color(0xFFF9F9F9);
 
-    // Flutter's Table requires every row to have the same cell count.
-    // OOXML rows with merged cells (colSpan/vMerge) don't guarantee that —
-    // normalize so the widget never crashes on real-world documents.
     final normalizedRows = TableGridNormalizer.isAlreadyUniform(block.rows)
         ? block.rows
         : TableGridNormalizer.normalize(block.rows);
 
+    if (normalizedRows.isEmpty) return const SizedBox.shrink();
+
+    final colCount =
+        (normalizedRows.first as docmodel.TableRow).cells.length;
+    if (colCount == 0) return const SizedBox.shrink();
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 12),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Table(
-          border:             TableBorder.all(color: borderColor, width: 0.8),
-          defaultColumnWidth: const IntrinsicColumnWidth(),
+      // LayoutBuilder gives the Table a bounded maxWidth so FlexColumnWidth
+      // can distribute space and RichText inside cells can wrap.
+      // Previously SingleChildScrollView gave infinite width → text never wrapped.
+      child: LayoutBuilder(
+        builder: (context, constraints) => Table(
+          border:        TableBorder.all(color: borderColor, width: 0.8),
+          // FlexColumnWidth distributes available width equally among columns.
+          // Text in cells now has a bounded width and wraps correctly.
+          columnWidths: {
+            for (int i = 0; i < colCount; i++) i: const FlexColumnWidth(),
+          },
           children: normalizedRows.asMap().entries.map((entry) {
-            final rowIdx  = entry.key;
-            final docRow  = entry.value as docmodel.TableRow;
+            final rowIdx   = entry.key;
+            final docRow   = entry.value as docmodel.TableRow;
             final isHeader = rowIdx == 0;
             return TableRow(
               decoration: BoxDecoration(
@@ -242,7 +252,8 @@ class _TableWidget extends StatelessWidget {
                 return TableCell(
                   child: Container(
                     color: bg,
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 8),
                     child: _CellContent(
                       cell:      cell,
                       isHeader:  isHeader,
