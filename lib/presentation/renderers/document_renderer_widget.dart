@@ -167,27 +167,40 @@ class _ImageWidget extends StatelessWidget {
     );
   }
 
-  Widget _placeholder(BuildContext context) => Container(
-    height: 80,
-    margin: const EdgeInsets.symmetric(vertical: 8),
-    decoration: BoxDecoration(
-      color: Theme.of(context).colorScheme.surfaceContainerHighest,
-      borderRadius: BorderRadius.circular(ThemeConstants.radiusSm),
+  Widget _placeholder(BuildContext context) {
+    final label = block.altText;
+    return Container(
+      height: block.heightPx?.clamp(40.0, 120.0) ?? 80,
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(ThemeConstants.radiusSm),
       border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
-    ),
-    child: Center(
-      child: Column(mainAxisSize: MainAxisSize.min, children: [
-        Icon(Icons.image_not_supported_outlined,
-            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4)),
-        if (block.altText != null) ...[
-          const SizedBox(height: 4),
-          Text(block.altText!, style: const TextStyle(fontSize: 11),
-              maxLines: 1, overflow: TextOverflow.ellipsis),
-        ],
-      ]),
-    ),
-  );
-}
+      ),
+      child: Center(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Icon(
+            label == '[Phương trình]'
+                ? Icons.functions_outlined
+                : Icons.image_not_supported_outlined,
+            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
+          ),
+          if (label != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ]),
+      ),
+    );
+  }
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // TABLE

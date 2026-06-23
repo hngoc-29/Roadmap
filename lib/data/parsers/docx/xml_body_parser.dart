@@ -106,8 +106,55 @@ class XmlBodyParser {
       'sectPr' => const [],
       'bookmarkStart' => const [],
       'bookmarkEnd'   => const [],
+
+      // <w:sdt> = structured document tag / content control.
+      // Content lives in <w:sdtContent> which can contain <w:p> and <w:tbl>.
+      // Silently returning [] here was causing whole sections to disappear.
+      'sdt' => _parseSdt(el, rels),
+
+      // <mc:AlternateContent> wraps fallback content for compatibility.
+      // Use the <mc:Fallback> child which contains plain <w:p>/<w:tbl>.
+      'AlternateContent' => _parseAlternateContent(el, rels),
+
       _ => const [],
     };
+  }
+
+  /// Unwrap <w:sdt> → <w:sdtContent> → recurse into children.
+  List<DocumentBlock> _parseSdt(XmlElement sdt, Map<String, String> rels) {
+    final sdtContent = sdt.childElements
+        .where((e) => e.localName == 'sdtContent')
+        .firstOrNull;
+    if (sdtContent == null) return const [];
+
+    final blocks = <DocumentBlock>[];
+    for (final child in sdtContent.childElements) {
+      try {
+        blocks.addAll(_parseBodyChild(child, rels));
+      } catch (e) {
+        _warnings.add('sdt child parse error: $e');
+      }
+    }
+    return blocks;
+  }
+
+  /// Use <mc:Fallback> content from <mc:AlternateContent>.
+  List<DocumentBlock> _parseAlternateContent(
+      XmlElement ac, Map<String, String> rels) {
+    final fallback = ac.childElements
+        .where((e) => e.localName == 'Fallback')
+        .firstOrNull;
+    if (fallback == null) return const [];
+
+    final blocks = <DocumentBlock>[];
+    for (final child in fallback.childElements) {
+      try {
+        blocks.addAll(_parseBodyChild(child, rels));
+      } catch (e) {
+        _warnings.add('AlternateContent fallback parse error: $e');
+      }
+    }
+    return blocks;
   }
 
   // ═════════════════════════════════════════════════════════════════════════════
@@ -246,18 +293,53 @@ class XmlBodyParser {
     final images = <ImageBlock>[];
 
     for (final el in p.descendants.whereType<XmlElement>()) {
-      if (el.localName != 'drawing') continue;
+      // ── Standard inline/floating image via <w:drawing> ──────────────────────
+      if (el.localName == 'drawing') {
+        final info = DrawingParser.parse(el);
+        if (info == null) continue;
+        images.add(ImageBlock(
+          id: _nextId(),
+          relationshipId: info.rId,
+          widthEmu: info.widthEmu,
+          heightEmu: info.heightEmu,
+          altText: info.altText ?? info.title,
+        ));
+      }
 
-      final info = DrawingParser.parse(el);
-      if (info == null) continue;
+      // ── OLE object (e.g. Equation.DSMT4 / MathType legacy equations) ────────
+      // These store a WMF/EMF raster preview inside <v:imagedata> and a binary
+      // OLE blob in <o:OLEObject>. Flutter can't decode WMF, so we create an
+      // ImageBlock anyway — the renderer's errorBuilder shows a placeholder that
+      // at least signals to the user that an equation is present.
+      if (el.localName == 'object') {
+        final imageData = el.descendants
+            .whereType<XmlElement>()
+            .where((e) => e.localName == 'imagedata')
+            .firstOrNull;
+        if (imageData == null) continue;
 
-      images.add(ImageBlock(
-        id: _nextId(),
-        relationshipId: info.rId,
-        widthEmu: info.widthEmu,
-        heightEmu: info.heightEmu,
-        altText: info.altText ?? info.title,
-      ));
+        // Attribute can be r:id or just id depending on namespace resolution
+        final rId = imageData.getAttribute('r:id') ??
+            imageData.getAttribute('id');
+        if (rId == null) continue;
+
+        // Dimensions are stored in dxa (twips). 1 twip = 635 EMU.
+        const twipToEmu = 635;
+        final dxaW = int.tryParse(
+                el.getAttribute('w:dxaOrig') ?? '') ??
+            0;
+        final dxaH = int.tryParse(
+                el.getAttribute('w:dyaOrig') ?? '') ??
+            0;
+
+        images.add(ImageBlock(
+          id: _nextId(),
+          relationshipId: rId,
+          widthEmu: dxaW > 0 ? (dxaW * twipToEmu).toDouble() : null,
+          heightEmu: dxaH > 0 ? (dxaH * twipToEmu).toDouble() : null,
+          altText: '[Phương trình]',
+        ));
+      }
     }
 
     return images;
