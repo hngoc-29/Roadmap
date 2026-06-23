@@ -8,6 +8,7 @@ import '../../../domain/abstractions/document_format.dart';
 import '../../../domain/abstractions/document_parser_interface.dart';
 import '../../../domain/abstractions/document_source.dart';
 import '../../models/document_model.dart';
+import '../../../platform/wmf_render_service.dart';
 import 'docx_extractor.dart';
 import 'numbering_parser.dart';
 import 'xml_body_parser.dart';
@@ -79,7 +80,15 @@ class DocxParser extends DocumentParserInterface {
 
     // Parse in background isolate
     try {
-      final model = await compute(_parseDocxInIsolate, _DocxParsePayload(bytes));
+      DocumentModel model = await compute(
+          _parseDocxInIsolate, _DocxParsePayload(bytes));
+
+      // ── Post-process: render WMF images via native Android channel ─────────
+      // compute() runs in a background Dart isolate where MethodChannels are
+      // unavailable. Back on the main isolate here, we convert any raw WMF
+      // bytes (magic 0xD7 0xCD 0xC6 0x9A) to PNG so Image.memory() can render
+      // them directly — no more grey placeholder boxes for equations.
+      model = await _renderWmfImages(model);
 
       AppLogger.info(
         'Parse complete: ${model.blockCount} blocks, '
@@ -103,5 +112,46 @@ class DocxParser extends DocumentParserInterface {
         source: source.path,
       );
     }
+  }
+
+  // ─── WMF post-processing ─────────────────────────────────────────────────
+
+  static const _wmfMagic = [0xD7, 0xCD, 0xC6, 0x9A]; // placeable WMF magic LE
+
+  static bool _isWmf(Uint8List bytes) =>
+      bytes.length > 4 &&
+      bytes[0] == _wmfMagic[0] &&
+      bytes[1] == _wmfMagic[1] &&
+      bytes[2] == _wmfMagic[2] &&
+      bytes[3] == _wmfMagic[3];
+
+  Future<DocumentModel> _renderWmfImages(DocumentModel model) async {
+    final wmfEntries =
+        model.images.entries.where((e) => _isWmf(e.value)).toList();
+    if (wmfEntries.isEmpty) return model;
+
+    AppLogger.info(
+      'Rendering ${wmfEntries.length} WMF equation image(s) via native channel',
+      tag: 'DocxParser',
+    );
+
+    final service = WmfRenderService();
+    final updated = Map<String, Uint8List>.from(model.images);
+
+    for (final entry in wmfEntries) {
+      try {
+        final png = await service.renderToPng(entry.value);
+        if (png != null) {
+          updated[entry.key] = png;
+          AppLogger.debug(
+              'WMF ${entry.key} → PNG ${png.length}B', tag: 'DocxParser');
+        }
+      } catch (e) {
+        AppLogger.warning(
+            'WMF render failed for ${entry.key}: $e', tag: 'DocxParser');
+      }
+    }
+
+    return model.copyWith(images: updated);
   }
 }
