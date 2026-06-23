@@ -201,6 +201,7 @@ class _ImageWidget extends StatelessWidget {
       ),
     );
   }
+} // end _ImageWidget
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // TABLE
