@@ -18,6 +18,10 @@ dependencies:
   archive: ^4.0.9
   # XML parsing (word/document.xml, styles.xml, etc.)
   xml: ^7.0.1
+  # PDF rendering — native platform renderer (Android PdfRenderer, iOS PDFKit)
+  pdfx: ^2.8.1
+  # Excel XLSX parsing
+  excel: ^4.0.6
 
   # ── File handling ─────────────────────────────────────────────────────────
   # Device temp/app directories for caching

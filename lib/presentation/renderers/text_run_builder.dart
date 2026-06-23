@@ -200,9 +200,18 @@ class TextRunBuilder {
     }
 
     final hlt      = style.highlightArgb != null ? Color(style.highlightArgb!) : null;
+    // fontSizePt is in typographic points. On screen at 96 dpi:
+    // 1pt = 1/72 inch = 96/72 px = 1.3333px.
+    // However the xml_body_parser stores values already in pt
+    // (half-pt ÷ 2), so the multiplier is correct.
+    // We clamp to 8–96 to handle edge cases.
     final fontSize = style.fontSizePt != null
-        ? (style.fontSizePt! * 1.333).clamp(8.0, 72.0)
+        ? (style.fontSizePt! * 1.3333).clamp(8.0, 96.0)
         : baseFontSize;
+
+    // Line height: Word uses "auto" spacing ≈ 1.15–1.20 of font size.
+    // Using 1.2 gives tighter, more Word-like spacing vs our old 1.4.
+    const lineHeight = 1.2;
 
     return TextStyle(
       fontWeight:      style.bold      ? FontWeight.bold   : FontWeight.normal,
@@ -213,7 +222,7 @@ class TextRunBuilder {
       color:           color,
       backgroundColor: hlt,
       fontFamily:      style.fontFamily,
-      height:          1.4,
+      height:          lineHeight,
     );
   }
 

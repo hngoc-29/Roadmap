@@ -395,3 +395,32 @@ final class HyperlinkBlock extends DocumentBlock {
 
   String get displayText => runs.map((r) => r.text).join();
 }
+
+// ── PDF ──────────────────────────────────────────────────────────────────────
+
+/// Represents a whole PDF file — rendered page-by-page by the native platform
+/// renderer (Android PdfRenderer / iOS PDFKit via the pdfx package).
+final class PdfDocumentBlock extends DocumentBlock {
+  final Uint8List bytes;
+  final int       pageCount;
+  const PdfDocumentBlock({
+    required super.id,
+    required this.bytes,
+    required this.pageCount,
+  });
+}
+
+// ── XLSX ─────────────────────────────────────────────────────────────────────
+
+/// One sheet of an Excel workbook rendered as a scrollable data grid.
+final class SpreadsheetBlock extends DocumentBlock {
+  final String              sheetName;
+  final List<List<String?>> rows;      // rows × cols, null = empty cell
+  final int                 colCount;
+  const SpreadsheetBlock({
+    required super.id,
+    required this.sheetName,
+    required this.rows,
+    required this.colCount,
+  });
+}

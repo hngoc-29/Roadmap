@@ -39,7 +39,9 @@ extension DocumentFormatX on DocumentFormat {
       };
 
   /// Whether this format is implemented in the current build.
-  bool get isSupported => this == DocumentFormat.docx;
+  bool get isSupported => this == DocumentFormat.docx
+      || this == DocumentFormat.pdf
+      || this == DocumentFormat.xlsx;
 
   static DocumentFormat? fromExtension(String ext) {
     final lower = ext.toLowerCase().replaceFirst('.', '');

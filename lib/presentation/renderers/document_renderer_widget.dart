@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pdfx/pdfx.dart';
 
 import '../../core/constants/app_constants.dart';
 import '../../core/constants/theme_constants.dart';
@@ -88,6 +89,8 @@ class DocumentRendererWidget extends ConsumerWidget {
             block:     block,
             onLinkTap: onLinkTap,
           ),
+        PdfDocumentBlock()  => _PdfDocumentWidget(block: block),
+        SpreadsheetBlock()  => _SpreadsheetWidget(block: block),
       };
     } catch (e) {
       return _ErrorBlock(blockId: block.id, error: e.toString());
@@ -457,6 +460,153 @@ class _ErrorBlock extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PDF DOCUMENT
+// ═══════════════════════════════════════════════════════════════════════════════
+
+class _PdfDocumentWidget extends StatefulWidget {
+  const _PdfDocumentWidget({required this.block});
+  final PdfDocumentBlock block;
+  @override
+  State<_PdfDocumentWidget> createState() => _PdfDocumentWidgetState();
+}
+
+class _PdfDocumentWidgetState extends State<_PdfDocumentWidget> {
+  late final PdfController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = PdfController(
+      document: PdfDocument.openData(widget.block.bytes),
+    );
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      // Fill the available height inside the ListView so PdfView has a
+      // bounded constraint to render pages.
+      height: MediaQuery.of(context).size.height * 0.85,
+      child: PdfView(
+        controller: _ctrl,
+        scrollDirection: Axis.vertical,
+        pageSnapping: false,
+        backgroundDecoration: const BoxDecoration(color: Color(0xFFF0F0F0)),
+        builders: PdfViewBuilders<DefaultBuilderOptions>(
+          options: const DefaultBuilderOptions(),
+          documentLoaderBuilder: (_) =>
+              const Center(child: CircularProgressIndicator()),
+          pageLoaderBuilder: (_) =>
+              const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+          errorBuilder: (_, e) => Center(
+            child: Text('Cannot render page: $e',
+                style: const TextStyle(color: Colors.red)),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SPREADSHEET (XLSX)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+class _SpreadsheetWidget extends StatelessWidget {
+  const _SpreadsheetWidget({required this.block});
+  final SpreadsheetBlock block;
+
+  @override
+  Widget build(BuildContext context) {
+    const headerBg  = Color(0xFF1565C0);
+    const headerFg  = Colors.white;
+    const altBg     = Color(0xFFF5F8FF);
+    const borderClr = Color(0xFFCFD8DC);
+    const cellH     = 36.0;
+    // Fixed column width; user can scroll horizontally for wide sheets
+    const colW      = 120.0;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // ── Sheet tab ──────────────────────────────────────────────────────
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: headerBg,
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(6), topRight: Radius.circular(6)),
+          ),
+          child: Text(block.sheetName,
+              style: const TextStyle(
+                  color: headerFg, fontWeight: FontWeight.w600, fontSize: 13)),
+        ),
+        // ── Grid ──────────────────────────────────────────────────────────
+        Padding(
+          padding: const EdgeInsets.only(bottom: 16),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: SizedBox(
+              width: colW * block.colCount,
+              child: ListView.builder(
+                shrinkWrap:  true,
+                physics:     const NeverScrollableScrollPhysics(),
+                itemCount:   block.rows.length,
+                itemBuilder: (context, rowIdx) {
+                  final row       = block.rows[rowIdx];
+                  final isHeader  = rowIdx == 0;
+                  return Container(
+                    height: cellH,
+                    decoration: BoxDecoration(
+                      color: isHeader ? headerBg : (rowIdx.isOdd ? altBg : Colors.white),
+                      border: const Border(
+                          bottom: BorderSide(color: borderClr, width: 0.5)),
+                    ),
+                    child: Row(
+                      children: List.generate(block.colCount, (colIdx) {
+                        final cell = colIdx < row.length ? row[colIdx] : null;
+                        return Container(
+                          width: colW,
+                          height: cellH,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            border: Border(
+                                right: BorderSide(
+                                    color: borderClr, width: 0.5)),
+                          ),
+                          child: Text(
+                            cell ?? '',
+                            style: TextStyle(
+                              fontSize:   12,
+                              fontWeight: isHeader
+                                  ? FontWeight.w600 : FontWeight.normal,
+                              color: isHeader ? headerFg : Colors.black87,
+                            ),
+                            overflow:   TextOverflow.ellipsis,
+                            maxLines:   1,
+                          ),
+                        );
+                      }),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
