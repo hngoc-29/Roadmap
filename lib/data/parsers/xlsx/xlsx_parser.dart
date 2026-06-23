@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
-import 'package:excel/excel.dart';
+import 'package:archive/archive.dart';
+import 'package:xml/xml.dart';
 
 import '../../../core/errors/app_exception.dart';
 import '../../../domain/abstractions/document_format.dart';
@@ -10,8 +11,13 @@ import '../../models/document_block.dart';
 import '../../models/document_metadata.dart';
 import '../../models/document_model.dart';
 
-/// XLSX parser — reads worksheets and produces [SpreadsheetBlock]s,
-/// one per sheet.
+/// XLSX parser — reads the ZIP+XML format directly using the packages already
+/// in the project (archive + xml), avoiding any dependency conflicts.
+///
+/// Handles:
+///   • xl/sharedStrings.xml  — string table (inline strings + shared strings)
+///   • xl/workbook.xml       — sheet names and order
+///   • xl/worksheets/sheet*.xml — cell values (strings, numbers, dates, bools)
 class XlsxParser extends DocumentParserInterface {
   XlsxParser();
 
@@ -27,68 +33,118 @@ class XlsxParser extends DocumentParserInterface {
       throw ParseException('Cannot read XLSX file: $e');
     }
 
-    Excel workbook;
+    Archive archive;
     try {
-      workbook = Excel.decodeBytes(bytes);
+      archive = ZipDecoder().decodeBytes(bytes);
     } catch (e) {
-      throw ParseException('Cannot parse XLSX: $e');
+      throw ParseException('Not a valid XLSX file (ZIP decode failed): $e');
     }
 
-    if (workbook.tables.isEmpty) {
-      throw const ParseException('XLSX file contains no sheets.');
+    // ── Read shared strings ──────────────────────────────────────────────────
+    final sharedStrings = <String>[];
+    final ssFile = archive.findFile('xl/sharedStrings.xml');
+    if (ssFile != null) {
+      try {
+        final doc = XmlDocument.parse(
+            String.fromCharCodes(ssFile.content as List<int>));
+        for (final si in doc.findAllElements('si')) {
+          // concat all <t> text nodes (handles rich-text runs inside a cell)
+          sharedStrings.add(
+            si.findAllElements('t').map((t) => t.innerText).join(),
+          );
+        }
+      } catch (_) { /* ignore malformed shared strings */ }
     }
 
-    final blocks    = <DocumentBlock>[];
-    final warnings  = <String>[];
-    int   blockIdx  = 0;
+    // ── Read sheet order & names from workbook.xml ──────────────────────────
+    final sheetOrder = <String, String>{}; // name → relationship id
+    final wbFile = archive.findFile('xl/workbook.xml');
+    if (wbFile != null) {
+      try {
+        final doc = XmlDocument.parse(
+            String.fromCharCodes(wbFile.content as List<int>));
+        for (final sheet in doc.findAllElements('sheet')) {
+          final name = sheet.getAttribute('name') ?? '';
+          final rId  = sheet.getAttribute('r:id') ?? '';
+          if (name.isNotEmpty && rId.isNotEmpty) sheetOrder[rId] = name;
+        }
+      } catch (_) {}
+    }
 
-    for (final sheetName in workbook.tables.keys) {
-      final sheet = workbook.tables[sheetName]!;
+    // ── Read sheet relationship → file mapping ───────────────────────────────
+    final rIdToPath = <String, String>{}; // rId → xl/worksheets/sheetN.xml
+    final relsFile = archive.findFile('xl/_rels/workbook.xml.rels');
+    if (relsFile != null) {
+      try {
+        final doc = XmlDocument.parse(
+            String.fromCharCodes(relsFile.content as List<int>));
+        for (final rel in doc.findAllElements('Relationship')) {
+          final id     = rel.getAttribute('Id') ?? '';
+          final target = rel.getAttribute('Target') ?? '';
+          if (target.toLowerCase().contains('sheet')) rIdToPath[id] = target;
+        }
+      } catch (_) {}
+    }
 
-      if (sheet.rows.isEmpty) {
-        warnings.add('Sheet "$sheetName" is empty — skipped.');
+    // ── Determine sheets to parse, in workbook order ─────────────────────────
+    final orderedSheets = <MapEntry<String, String>>[]; // name → file path
+    for (final entry in sheetOrder.entries) {
+      final path = rIdToPath[entry.key];
+      if (path != null) {
+        final full = path.startsWith('xl/') ? path : 'xl/$path';
+        orderedSheets.add(MapEntry(entry.value, full));
+      }
+    }
+    // Fallback: if workbook.xml wasn't parseable, add all worksheet files
+    if (orderedSheets.isEmpty) {
+      for (final f in archive.files) {
+        if (f.name.startsWith('xl/worksheets/sheet') &&
+            f.name.endsWith('.xml')) {
+          orderedSheets.add(MapEntry(f.name.split('/').last, f.name));
+        }
+      }
+    }
+
+    if (orderedSheets.isEmpty) {
+      throw const ParseException('XLSX file contains no worksheets.');
+    }
+
+    // ── Parse each worksheet ─────────────────────────────────────────────────
+    final blocks   = <DocumentBlock>[];
+    final warnings = <String>[];
+    int   idx      = 0;
+
+    for (final sheet in orderedSheets) {
+      final name     = sheet.key;
+      final filePath = sheet.value;
+      final file     = archive.findFile(filePath);
+      if (file == null) {
+        warnings.add('Sheet "$name": file "$filePath" not found in archive.');
         continue;
       }
 
-      // Convert each cell to a display string
-      final rows = <List<String?>>[];
-      int colCount = 0;
-
-      for (final row in sheet.rows) {
-        final cells = row.map((cell) {
-          if (cell == null || cell.value == null) return null;
-          final v = cell.value;
-          return switch (v) {
-            TextCellValue()   => v.value,
-            IntCellValue()    => v.value.toString(),
-            DoubleCellValue() => _formatDouble(v.value),
-            BoolCellValue()   => v.value ? 'TRUE' : 'FALSE',
-            DateCellValue()   => '${v.year}-${_pad(v.month)}-${_pad(v.day)}',
-            DateTimeCellValue() =>
-              '${v.year}-${_pad(v.month)}-${_pad(v.day)} '
-              '${_pad(v.hour)}:${_pad(v.minute)}',
-            FormulaCellValue() => v.formula,
-            _ => v.toString(),
-          };
-        }).toList();
-
-        rows.add(cells);
-        if (cells.length > colCount) colCount = cells.length;
+      List<List<String?>> rows;
+      try {
+        rows = _parseWorksheet(file.content as List<int>, sharedStrings);
+      } catch (e) {
+        warnings.add('Sheet "$name" parse error: $e');
+        continue;
       }
 
-      // Trim entirely-empty trailing rows
-      while (rows.isNotEmpty && rows.last.every((c) => c == null || c.isEmpty)) {
+      // Trim trailing empty rows
+      while (rows.isNotEmpty && rows.last.every((c) => c == null || c!.isEmpty)) {
         rows.removeLast();
       }
-
       if (rows.isEmpty) {
-        warnings.add('Sheet "$sheetName" has no data after trimming.');
+        warnings.add('Sheet "$name" is empty after trimming.');
         continue;
       }
 
+      final colCount = rows.fold(0, (m, r) => r.length > m ? r.length : m);
+
       blocks.add(SpreadsheetBlock(
-        id:        'sheet_${blockIdx++}',
-        sheetName: sheetName,
+        id:        'sheet_${idx++}',
+        sheetName: name,
         rows:      rows,
         colCount:  colCount,
       ));
@@ -100,7 +156,7 @@ class XlsxParser extends DocumentParserInterface {
 
     return DocumentModel(
       blocks:        blocks,
-      metadata: DocumentMetadata(
+      metadata:      DocumentMetadata(
         title:    source.name ?? 'Spreadsheet',
         modified: DateTime.now(),
       ),
@@ -109,14 +165,83 @@ class XlsxParser extends DocumentParserInterface {
     );
   }
 
-  // ── helpers ────────────────────────────────────────────────────────────────
+  // ── Worksheet parser ────────────────────────────────────────────────────────
 
-  static String _formatDouble(double v) {
-    if (v == v.truncateToDouble()) return v.truncate().toString();
-    // Trim unnecessary trailing zeros
-    return v.toStringAsFixed(10).replaceAll(RegExp(r'0+$'), '').replaceAll(RegExp(r'\.$'), '');
+  List<List<String?>> _parseWorksheet(
+      List<int> bytes, List<String> sharedStrings) {
+    final doc  = XmlDocument.parse(String.fromCharCodes(bytes));
+    final rows = <List<String?>>[];
+
+    for (final row in doc.findAllElements('row')) {
+      final cells = <String?>[];
+      int   lastCol = -1;
+
+      for (final c in row.findAllElements('c')) {
+        // Cell reference, e.g. "A1", "B3"
+        final ref    = c.getAttribute('r') ?? '';
+        final colIdx = _colIndex(ref);
+
+        // Fill gaps with null for missing cells
+        while (cells.length < colIdx) cells.add(null);
+
+        cells.add(_cellValue(c, sharedStrings));
+        lastCol = colIdx;
+      }
+
+      rows.add(cells);
+    }
+
+    return rows;
   }
 
-  static String _pad(int n) => n.toString().padLeft(2, '0');
+  /// Convert column letter(s) from cell ref (e.g. "AB3") to 0-based index.
+  int _colIndex(String ref) {
+    int col = 0;
+    for (final ch in ref.runes) {
+      final c = String.fromCharCode(ch);
+      if (c.compareTo('A') >= 0 && c.compareTo('Z') <= 0) {
+        col = col * 26 + (ch - 'A'.codeUnitAt(0) + 1);
+      } else {
+        break; // hit digits → done
+      }
+    }
+    return col > 0 ? col - 1 : 0;
+  }
+
+  /// Extract a human-readable string from a `<c>` element.
+  String? _cellValue(XmlElement c, List<String> sharedStrings) {
+    final type = c.getAttribute('t') ?? ''; // s=shared, b=bool, e=error, str=formula
+    final vEl  = c.findElements('v').firstOrNull;
+    final fEl  = c.findElements('f').firstOrNull;
+    final isEl = c.findElements('is').firstOrNull; // inline string
+
+    if (isEl != null) {
+      return isEl.findAllElements('t').map((t) => t.innerText).join();
+    }
+
+    final raw = vEl?.innerText ?? fEl?.innerText;
+    if (raw == null || raw.isEmpty) return null;
+
+    return switch (type) {
+      's'   => int.tryParse(raw) != null && int.parse(raw) < sharedStrings.length
+                    ? sharedStrings[int.parse(raw)]
+                    : raw,
+      'b'   => raw == '1' ? 'TRUE' : 'FALSE',
+      'e'   => raw,  // error string like #REF!
+      'str' => raw,  // formula result as string
+      _     => _formatNumber(raw),
+    };
+  }
+
+  /// Format a numeric string — remove unnecessary trailing zeros.
+  String _formatNumber(String raw) {
+    final d = double.tryParse(raw);
+    if (d == null) return raw;
+    if (d == d.truncateToDouble()) return d.truncate().toString();
+    return d.toStringAsFixed(10)
+        .replaceAll(RegExp(r'0+$'), '')
+        .replaceAll(RegExp(r'\.$'), '');
+  }
 }
+
 
