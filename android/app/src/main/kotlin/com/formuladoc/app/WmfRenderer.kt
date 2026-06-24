@@ -161,7 +161,11 @@ class WmfRenderer {
 
         // ── 5. GDI state ──────────────────────────────────────────────────────
         val objTable = HashMap<Int, GdiObj>()
-        var nextObj  = 0
+        // WMF spec §3.1.5: new objects take the LOWEST available slot.
+        // Freed slots (DELETEOBJECT) are reused. A sequential counter breaks
+        // this — after any delete/create pair every SELECTOBJECT picks the
+        // wrong object, causing Symbol ↔ Times New Roman to be swapped.
+        fun nextSlot(): Int { var i = 0; while (objTable.containsKey(i)) i++; return i }
         var curX = 0f;  var curY = 0f
         var textColor = Color.BLACK
         var penColor  = Color.BLACK
@@ -233,7 +237,7 @@ class WmfRenderer {
                         val cb     = buf.get().toInt() and 0xFF
                         val cg     = buf.get().toInt() and 0xFF
                         val cr     = buf.get().toInt() and 0xFF
-                        objTable[nextObj++] = PenObj(Color.rgb(cr, cg, cb), wx, style)
+                        objTable[nextSlot()] = PenObj(Color.rgb(cr, cg, cb), wx, style)
                     }
                 }
 
@@ -272,7 +276,7 @@ class WmfRenderer {
                             else ->
                                 Typeface.create(Typeface.DEFAULT, style)
                         }
-                        objTable[nextObj++] = FontObj(tf, lfHeight, isSym)
+                        objTable[nextSlot()] = FontObj(tf, lfHeight, isSym)
                     }
                 }
 

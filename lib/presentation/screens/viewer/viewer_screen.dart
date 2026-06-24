@@ -280,40 +280,68 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
   }
 
   Widget _buildDocumentView(BuildContext context, DocumentState state) {
-    return InteractiveViewer(
-      transformationController: _transformController,
-      minScale:    AppConstants.minZoom,
-      maxScale:    AppConstants.maxZoom,
-      panEnabled:  false,
-      onInteractionUpdate: (_) {
-        final scale = _transformController.value.getMaxScaleOnAxis();
-        if ((scale - _currentZoom).abs() > 0.01) {
-          setState(() => _currentZoom = scale);
-        }
-      },
-      child: SizedBox(
-        width: MediaQuery.of(context).size.width,
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: AppConstants.documentMaxWidth),
-            // Force light theme: documents are designed for white paper.
-            // Dark mode should only affect app chrome (AppBar, Home, etc.),
-            // not document content which has its own hardcoded colors.
-            child: Theme(
-              data: AppTheme.light,
-              child: Container(
-                color: ThemeConstants.paperLight,
-                child: DocumentRendererWidget(
-                  model:            state.model!,
-                  scrollController: _scrollController,
-                  onLinkTap:        _handleLinkTap,
+    // LayoutBuilder gives us the exact available viewport (Expanded area).
+    // We pass these as explicit SizedBox dimensions so the inner ListView
+    // gets bounded height constraints even though InteractiveViewer
+    // (constrained:false) would otherwise pass infinite height → black screen.
+    return LayoutBuilder(builder: (context, constraints) {
+      final viewW = constraints.maxWidth;
+      final viewH = constraints.maxHeight;
+
+      return Stack(children: [
+        // ── White gap fill ─────────────────────────────────────────────────
+        // When zoom < 1 the scaled content is smaller than the viewport,
+        // exposing the parent (dark Scaffold) background → black gaps.
+        // This covers all four gaps with paper-white.
+        Container(color: ThemeConstants.paperLight),
+
+        // ── Zoomable + pannable content ────────────────────────────────────
+        InteractiveViewer(
+          transformationController: _transformController,
+          minScale: AppConstants.minZoom,
+          maxScale: AppConstants.maxZoom,
+          // constrained:false → child can grow beyond viewport so the user
+          // can pan to see the overflow when zoomed in.
+          constrained: false,
+          // panEnabled:true (the default) is required for 2-finger pinch-zoom
+          // to function correctly. With panEnabled:false Flutter cancels the
+          // entire multi-touch interaction when a pan component is detected,
+          // preventing zoom-out with 2 fingers.
+          // Single-finger vertical scroll is still owned by the ListView
+          // inside DocumentRendererWidget — Flutter's gesture arena gives
+          // inner scrollables priority for vertical single-touch drags.
+          panEnabled: true,
+          onInteractionUpdate: (_) {
+            final scale = _transformController.value.getMaxScaleOnAxis();
+            if ((scale - _currentZoom).abs() > 0.01) {
+              setState(() => _currentZoom = scale);
+            }
+          },
+          child: SizedBox(
+            // Explicit dimensions so ListView receives bounded constraints.
+            width:  viewW,
+            height: viewH,
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(
+                    maxWidth: AppConstants.documentMaxWidth),
+                child: Theme(
+                  data: AppTheme.light,
+                  child: Container(
+                    color: ThemeConstants.paperLight,
+                    child: DocumentRendererWidget(
+                      model:            state.model!,
+                      scrollController: _scrollController,
+                      onLinkTap:        _handleLinkTap,
+                    ),
+                  ),
                 ),
               ),
             ),
           ),
         ),
-      ),
-    );
+      ]);
+    });
   }
 }
 
