@@ -297,7 +297,10 @@ class DocxSerializer {
         ListBlock()       => _listToXml(block, ctx),
         EquationBlock()   => _equationToXml(block),
         ImageBlock()      => _imagePlaceholderXml(block),
-        HyperlinkBlock()  => _standaloneHyperlinkXml(block, ctx),
+        HyperlinkBlock()    => _standaloneHyperlinkXml(block, ctx),
+        // PDF and XLSX blocks are view-only — not serializable to DOCX
+        PdfDocumentBlock()  => '',
+        SpreadsheetBlock()  => '',
       };
 
   // ── Paragraph ─────────────────────────────────────────────────────────────

@@ -8,7 +8,6 @@ import '../../../domain/abstractions/document_format.dart';
 import '../../../domain/abstractions/document_parser_interface.dart';
 import '../../../domain/abstractions/document_source.dart';
 import '../../models/document_block.dart';
-import '../../models/document_metadata.dart';
 import '../../models/document_model.dart';
 
 /// XLSX parser — reads the ZIP+XML format directly using the packages already
