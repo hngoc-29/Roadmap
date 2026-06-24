@@ -45,6 +45,20 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
   String? _currentFileId; // FileRecord.id for history
   Timer?  _scrollSaveTimer;
 
+  // ── Zoom / gesture tracking ────────────────────────────────────────────────
+  // Tracks how many fingers are currently on screen so we can switch between
+  // "scroll mode" (1 finger at zoom=1) and "pan/zoom mode" (2 fingers or
+  // any finger when scale > 1).
+  int  _activePointers = 0;
+  bool _multiTouch     = false;
+
+  /// Whether InteractiveViewer should handle panning.
+  ///
+  /// True when:
+  ///   • Two or more fingers are down (pinch-zoom needs pan enabled), OR
+  ///   • Already zoomed in (single-finger pans the zoomed content).
+  bool get _panActive => _multiTouch || _currentZoom > 1.005;
+
   @override
   void initState() {
     super.initState();
@@ -280,68 +294,101 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
   }
 
   Widget _buildDocumentView(BuildContext context, DocumentState state) {
-    // LayoutBuilder gives us the exact available viewport (Expanded area).
-    // We pass these as explicit SizedBox dimensions so the inner ListView
-    // gets bounded height constraints even though InteractiveViewer
-    // (constrained:false) would otherwise pass infinite height → black screen.
-    return LayoutBuilder(builder: (context, constraints) {
-      final viewW = constraints.maxWidth;
-      final viewH = constraints.maxHeight;
+    // ── Listener tracks active pointer count ────────────────────────────────
+    // We use raw pointer events (not GestureDetector) so we can reliably
+    // count fingers without fighting the gesture arena.
+    return Listener(
+      behavior: HitTestBehavior.translucent,
+      onPointerDown: (_) {
+        _activePointers++;
+        // As soon as a second finger touches, enable pan in InteractiveViewer
+        // so the pinch-zoom gesture can include a pan component (Flutter
+        // requires panEnabled:true for reliable multi-touch scale).
+        if (_activePointers >= 2 && !_multiTouch) {
+          setState(() => _multiTouch = true);
+        }
+      },
+      onPointerUp: (_) {
+        if (_activePointers > 0) _activePointers--;
+        if (_activePointers < 2 && _multiTouch) {
+          setState(() => _multiTouch = false);
+        }
+      },
+      onPointerCancel: (_) {
+        if (_activePointers > 0) _activePointers--;
+        if (_activePointers < 2 && _multiTouch) {
+          setState(() => _multiTouch = false);
+        }
+      },
+      child: LayoutBuilder(builder: (context, constraints) {
+        final viewW = constraints.maxWidth;
+        final viewH = constraints.maxHeight;
 
-      return Stack(children: [
-        // ── White gap fill ─────────────────────────────────────────────────
-        // When zoom < 1 the scaled content is smaller than the viewport,
-        // exposing the parent (dark Scaffold) background → black gaps.
-        // This covers all four gaps with paper-white.
-        Container(color: ThemeConstants.paperLight),
+        return Stack(children: [
+          // ── White gap fill ─────────────────────────────────────────────
+          // When scale < 1 the shrunken content leaves gaps. A plain white
+          // Container behind the InteractiveViewer fills them so the user
+          // never sees the dark Scaffold background.
+          Container(color: ThemeConstants.paperLight),
 
-        // ── Zoomable + pannable content ────────────────────────────────────
-        InteractiveViewer(
-          transformationController: _transformController,
-          minScale: AppConstants.minZoom,
-          maxScale: AppConstants.maxZoom,
-          // constrained:false → child can grow beyond viewport so the user
-          // can pan to see the overflow when zoomed in.
-          constrained: false,
-          // panEnabled:true (the default) is required for 2-finger pinch-zoom
-          // to function correctly. With panEnabled:false Flutter cancels the
-          // entire multi-touch interaction when a pan component is detected,
-          // preventing zoom-out with 2 fingers.
-          // Single-finger vertical scroll is still owned by the ListView
-          // inside DocumentRendererWidget — Flutter's gesture arena gives
-          // inner scrollables priority for vertical single-touch drags.
-          panEnabled: true,
-          onInteractionUpdate: (_) {
-            final scale = _transformController.value.getMaxScaleOnAxis();
-            if ((scale - _currentZoom).abs() > 0.01) {
-              setState(() => _currentZoom = scale);
-            }
-          },
-          child: SizedBox(
-            // Explicit dimensions so ListView receives bounded constraints.
-            width:  viewW,
-            height: viewH,
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(
-                    maxWidth: AppConstants.documentMaxWidth),
-                child: Theme(
-                  data: AppTheme.light,
-                  child: Container(
-                    color: ThemeConstants.paperLight,
-                    child: DocumentRendererWidget(
-                      model:            state.model!,
-                      scrollController: _scrollController,
-                      onLinkTap:        _handleLinkTap,
+          InteractiveViewer(
+            transformationController: _transformController,
+            minScale: AppConstants.minZoom,
+            maxScale: AppConstants.maxZoom,
+            constrained: false, // lets content exceed viewport when zoomed in
+
+            // Dynamic pan: off during single-finger-at-1× so the ListView
+            // inside can scroll normally; on during pinch or when zoomed in.
+            panEnabled: _panActive,
+
+            onInteractionUpdate: (_) {
+              final s = _transformController.value.getMaxScaleOnAxis();
+              if ((s - _currentZoom).abs() > 0.01) {
+                setState(() => _currentZoom = s);
+              }
+            },
+            onInteractionEnd: (_) {
+              // If the user fully pinched back to 1×, snap the matrix to
+              // identity so the content re-centres and scrolling resumes.
+              final s = _transformController.value.getMaxScaleOnAxis();
+              if (s <= 1.005) {
+                _transformController.value = Matrix4.identity();
+                if (_currentZoom != 1.0) setState(() => _currentZoom = 1.0);
+              }
+            },
+
+            child: SizedBox(
+              // Explicit viewport dimensions give the inner ListView bounded
+              // height constraints (constrained:false would pass ∞ otherwise).
+              width:  viewW,
+              height: viewH,
+              child: AbsorbPointer(
+                // Block ListView touch events while panning / zoomed in,
+                // so InteractiveViewer owns the gesture exclusively.
+                absorbing: _panActive,
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(
+                        maxWidth: AppConstants.documentMaxWidth),
+                    child: Theme(
+                      data: AppTheme.light,
+                      child: Container(
+                        color: ThemeConstants.paperLight,
+                        child: DocumentRendererWidget(
+                          model:            state.model!,
+                          scrollController: _scrollController,
+                          onLinkTap:        _handleLinkTap,
+                        ),
+                      ),
                     ),
                   ),
                 ),
               ),
             ),
           ),
-        ),
-      ]);
-    });
+        ]);
+      }),
+    );
   }
 }
 
