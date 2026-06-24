@@ -95,7 +95,19 @@ class WmfRenderer {
             0xD8 -> "¬";      0xD9 -> "∧"; 0xDA -> "∨"
             0xDB -> "⇔";      0xDC -> "⇐"; 0xDD -> "⇑"
             0xDE -> "⇒";      0xDF -> "⇓"
-            0xE5 -> "∑";      0xF2 -> "∫"
+            // 0xE0-0xEF: misc symbols + LARGE BRACKET COMPONENTS
+            // These are critical for MathType structural formulas: a left
+            // curly brace spanning multiple lines uses 0xEC (top), 0xED
+            // (middle), 0xEE (bottom), 0xEF (extension piece).
+            0xE0 -> "◊"; 0xE1 -> "〈"; 0xE2 -> "®"
+            0xE3 -> "©"; 0xE4 -> "™"
+            0xE5 -> "∑"
+            0xE6 -> "⎛"; 0xE7 -> "⎜"; 0xE8 -> "⎝"  // large ( parts
+            0xE9 -> "⎡"; 0xEA -> "⎢"; 0xEB -> "⎣"  // large [ parts
+            0xEC -> "⎧"; 0xED -> "⎨"; 0xEE -> "⎩"; 0xEF -> "⎪" // large { parts
+            // 0xF0-0xF1
+            0xF0 -> "⟩"; 0xF1 -> "〉"
+            0xF2 -> "∫"
             else -> if (b in 0x20..0x7E) b.toChar().toString() else "?"
         }
     }
