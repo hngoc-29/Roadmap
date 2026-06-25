@@ -157,9 +157,31 @@ class WmfRenderer {
         val winW = (right - left).toFloat().coerceAtLeast(1f)
         val winH = (bottom - top).toFloat().coerceAtLeast(1f)
         val pxW  = (winW / inch * targetDpi).roundToInt().coerceIn(1, 4096)
-        val pxH  = (winH / inch * targetDpi).roundToInt().coerceIn(1, 4096)
+
+        // Pre-scan records to find the largest font height used.
+        // WMF equations place text near the bottom of the window extent, then
+        // the font's ascent + descent push the glyphs BELOW the logical boundary.
+        // Without extra height the bottom of every equation is clipped by 22–32px.
+        val recStart = 22 + hdrSize * 2
+        var maxFontLogical = 0f
+        val scanBuf = ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN)
+        scanBuf.position(recStart)
+        while (scanBuf.remaining() >= 6) {
+            val rw = scanBuf.int; val fn = scanBuf.short.toInt() and 0xFFFF
+            val rb = rw * 2; val ps = scanBuf.position()
+            if (fn == 0 || rb < 6) break
+            if (fn == 0x02FB && scanBuf.remaining() >= 2) {  // CREATEFONTINDIRECT
+                val h = kotlin.math.abs(scanBuf.short.toFloat())
+                if (h > maxFontLogical) maxFontLogical = h
+            }
+            scanBuf.position((ps + rb - 6).coerceAtMost(data.size))
+        }
+        val maxFontPx = (maxFontLogical / inch * targetDpi).roundToInt()
+
+        // Add one full maxFontPx of padding so descenders are never clipped.
+        val pxH = (winH / inch * targetDpi + maxFontPx).roundToInt().coerceIn(1, 4096)
         val scaleX = pxW / winW
-        val scaleY = pxH / winH
+        val scaleY = pxH / (winH + maxFontLogical)  // scale based on padded logical height
 
         val bitmap = Bitmap.createBitmap(pxW, pxH, Bitmap.Config.ARGB_8888)
         bitmap.eraseColor(Color.WHITE)

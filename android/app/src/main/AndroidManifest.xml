@@ -53,6 +53,22 @@
                 <data android:mimeType="application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
             </intent-filter>
 
+            <!-- PDF — content:// URIs (Google Drive, Gmail, Downloads) -->
+            <intent-filter android:label="@string/open_with_formuladoc">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:mimeType="application/pdf" />
+            </intent-filter>
+
+            <!-- XLSX — content:// URIs -->
+            <intent-filter android:label="@string/open_with_formuladoc">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:mimeType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" />
+            </intent-filter>
+
             <!-- "Open with" via file URI (some older file managers) -->
             <intent-filter android:label="@string/open_with_formuladoc">
                 <action android:name="android.intent.action.VIEW" />
@@ -60,6 +76,15 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="file" />
                 <data android:mimeType="application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
+            </intent-filter>
+
+            <!-- PDF via file URI -->
+            <intent-filter android:label="@string/open_with_formuladoc">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="file" />
+                <data android:mimeType="application/pdf" />
             </intent-filter>
 
             <!-- "Open with" by file extension — file managers that send */* MIME -->
@@ -70,6 +95,26 @@
                 <data android:mimeType="*/*" />
                 <data android:host="*" />
                 <data android:pathPattern=".*\\.docx" />
+            </intent-filter>
+
+            <!-- PDF by extension -->
+            <intent-filter android:label="@string/open_with_formuladoc">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="file" />
+                <data android:mimeType="*/*" />
+                <data android:host="*" />
+                <data android:pathPattern=".*\\.pdf" />
+            </intent-filter>
+
+            <!-- XLSX by extension -->
+            <intent-filter android:label="@string/open_with_formuladoc">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="file" />
+                <data android:mimeType="*/*" />
+                <data android:host="*" />
+                <data android:pathPattern=".*\\.xlsx" />
             </intent-filter>
 
             <!-- Flutter embedding meta-data -->
