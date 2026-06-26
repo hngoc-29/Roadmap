@@ -77,11 +77,16 @@ class PlatformIntentHandler {
       final path = file.path.trim();
       if (path.isEmpty) continue;
 
-      // Only handle DOCX files — ignore images / videos accidentally shared
       final ext = path.toLowerCase();
-      if (!ext.endsWith('.docx') && !ext.endsWith('.doc')) {
+      final supported = ext.endsWith('.docx') ||
+          ext.endsWith('.doc')  ||
+          ext.endsWith('.pdf')  ||
+          ext.endsWith('.xlsx') ||
+          ext.endsWith('.xls');
+
+      if (!supported) {
         AppLogger.debug(
-          'Ignoring non-document file from intent: $path',
+          'Ignoring unsupported file from intent: $path',
           tag: 'PlatformIntentHandler',
         );
         continue;
@@ -92,9 +97,7 @@ class PlatformIntentHandler {
         tag: 'PlatformIntentHandler',
       );
 
-      if (!_controller.isClosed) {
-        _controller.add(path);
-      }
+      if (!_controller.isClosed) _controller.add(path);
     }
   }
 

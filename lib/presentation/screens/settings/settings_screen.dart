@@ -1,190 +1,128 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 
 import '../../../core/constants/app_constants.dart';
 import '../../../core/constants/theme_constants.dart';
-import '../../../data/parsers/parser_registry.dart';
 import '../../providers/history_provider.dart';
 import '../../providers/service_providers.dart';
-import '../../../domain/abstractions/document_format.dart';
+import '../../providers/theme_provider.dart';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // SETTINGS SCREEN
 // ═══════════════════════════════════════════════════════════════════════════════
 
-class SettingsScreen extends ConsumerStatefulWidget {
+class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
   @override
-  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
-}
-
-class _SettingsScreenState extends ConsumerState<SettingsScreen> {
-  ThemeMode _themeMode = ThemeMode.system;
-
-  @override
-  Widget build(BuildContext context) {
-    final cache    = ref.watch(documentCacheProvider);
-    final registry = ref.watch(parserRegistryProvider);
+  Widget build(BuildContext context, WidgetRef ref) {
+    final themeMode = ref.watch(themeModeProvider);
 
     return Scaffold(
       appBar: AppBar(
-        title:       const Text('Settings'),
+        title: const Text('Cài đặt'),
         centerTitle: false,
       ),
       body: ListView(
         children: [
-          // ── App header ──────────────────────────────────────────────────
-          _SectionHeader(child: _AppHeader()),
 
-          const SizedBox(height: 8),
+          // ── App header ────────────────────────────────────────────────────
+          _AppHeader(),
+          const SizedBox(height: 4),
 
-          // ── Appearance ──────────────────────────────────────────────────
+          // ── Giao diện ─────────────────────────────────────────────────────
           _SectionCard(
-            title:    'Appearance',
-            icon:     Icons.palette_outlined,
+            title: 'Giao diện',
+            icon:  Icons.palette_outlined,
             children: [
               ListTile(
-                title:    const Text('Theme'),
-                subtitle: Text(_themeName(_themeMode)),
+                title:    const Text('Chủ đề'),
+                subtitle: Text(_themeName(themeMode)),
                 trailing: const Icon(Icons.chevron_right),
-                onTap:    () => _showThemePicker(context),
+                onTap: () => _showThemePicker(context, ref, themeMode),
               ),
             ],
           ),
 
-          // ── Document cache ───────────────────────────────────────────────
+          // ── Bộ nhớ đệm ───────────────────────────────────────────────────
           _SectionCard(
-            title:    'Document Cache',
-            icon:     Icons.storage_outlined,
-            children: [
-              _StatRow(
-                label: 'Cached documents',
-                value: '${cache.size} / ${cache.maxEntries}',
-              ),
-              _StatRow(
-                label: 'Estimated size',
-                value: _formatKb(cache.estimatedSizeKb()),
-              ),
-              if (cache.cachedPaths.isNotEmpty)
-                ExpansionTile(
-                  title:    const Text('Cached files'),
-                  tilePadding: const EdgeInsets.symmetric(horizontal: 16),
-                  children: cache.cachedPaths.map((p) => ListTile(
-                    leading: const Icon(Icons.description_outlined, size: 18),
-                    title:   Text(
-                      p.split('/').last,
-                      style: const TextStyle(fontSize: 13),
-                      maxLines:  1,
-                      overflow:  TextOverflow.ellipsis,
-                    ),
-                    dense: true,
-                  )).toList(),
-                ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-                child: OutlinedButton.icon(
-                  onPressed: () => _clearCache(context),
-                  icon:  const Icon(Icons.delete_sweep_outlined, size: 18),
-                  label: const Text('Clear Cache'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Theme.of(context).colorScheme.error,
-                    side: BorderSide(
-                        color: Theme.of(context).colorScheme.error.withValues(alpha: 0.5)),
-                  ),
-                ),
-              ),
-            ],
-          ),
-
-          // ── File history ────────────────────────────────────────────────
-          _SectionCard(
-            title:    'File History',
-            icon:     Icons.history_outlined,
+            title: 'Bộ nhớ đệm',
+            icon:  Icons.storage_outlined,
             children: [
               Consumer(builder: (context, ref, _) {
-                final histState = ref.watch(historyNotifierProvider);
-                return Column(
-                  children: [
-                    _StatRow(
-                      label: 'Recent files',
-                      value: '${histState.recentFiles.length}',
-                    ),
-                    _StatRow(
-                      label: 'Favorites',
-                      value: '${histState.favorites.length}',
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-                      child: OutlinedButton.icon(
-                        onPressed: () => _clearHistory(context),
-                        icon:  const Icon(Icons.clear_all, size: 18),
-                        label: const Text('Clear History'),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: Theme.of(context).colorScheme.error,
-                          side: BorderSide(
-                              color: Theme.of(context).colorScheme.error.withValues(alpha: 0.5)),
-                        ),
-                      ),
-                    ),
-                  ],
-                );
+                final cache = ref.watch(documentCacheProvider);
+                return Column(children: [
+                  _InfoRow(
+                    label: 'Tài liệu đã lưu',
+                    value: '${cache.size} / ${cache.maxEntries}',
+                  ),
+                  _InfoRow(
+                    label: 'Dung lượng',
+                    value: _formatSize(cache.estimatedSizeKb()),
+                  ),
+                  _ActionButton(
+                    label: 'Xóa bộ nhớ đệm',
+                    icon:  Icons.delete_sweep_outlined,
+                    onTap: () => _clearCache(context, ref),
+                  ),
+                ]);
               }),
             ],
           ),
 
-          // ── Supported formats ────────────────────────────────────────────
+          // ── Lịch sử ───────────────────────────────────────────────────────
           _SectionCard(
-            title:    'Supported Formats',
-            icon:     Icons.folder_open_outlined,
+            title: 'Lịch sử tài liệu',
+            icon:  Icons.history_outlined,
             children: [
-              ...DocumentFormat.values.map((fmt) => ListTile(
-                leading: _FormatDot(supported: fmt.isSupported),
-                title:   Text(fmt.displayName),
-                subtitle: Text(
-                  fmt.isSupported ? 'Fully supported' : 'Coming soon',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: fmt.isSupported
-                        ? Colors.green.shade700
-                        : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+              Consumer(builder: (context, ref, _) {
+                final hist = ref.watch(historyNotifierProvider);
+                return Column(children: [
+                  _InfoRow(
+                    label: 'Đã mở gần đây',
+                    value: '${hist.recentFiles.length}',
                   ),
-                ),
-                trailing: Text(
-                  '.${fmt.extensions.join(' / .')}',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
-                    fontFamily: 'monospace',
+                  _InfoRow(
+                    label: 'Yêu thích',
+                    value: '${hist.favorites.length}',
                   ),
-                ),
-                dense: true,
-              )),
+                  _ActionButton(
+                    label: 'Xóa lịch sử',
+                    icon:  Icons.clear_all,
+                    onTap: () => _clearHistory(context, ref),
+                  ),
+                ]);
+              }),
             ],
           ),
 
-          // ── About ────────────────────────────────────────────────────────
+          // ── Định dạng hỗ trợ ──────────────────────────────────────────────
           _SectionCard(
-            title:    'About',
-            icon:     Icons.info_outline,
+            title: 'Định dạng hỗ trợ',
+            icon:  Icons.folder_open_outlined,
             children: [
-              _StatRow(label: 'Version',    value: AppConstants.appVersion),
-              _StatRow(label: 'Build',      value: 'Phase 5 / 5'),
-              _StatRow(
-                label: 'Parsers registered',
-                value: '${registry.registeredCount}',
-              ),
-              ListTile(
-                leading:  const Icon(Icons.science_outlined),
-                title:    const Text('Math Engine'),
-                subtitle: const Text('OMML → LaTeX via built-in renderer'),
+              _FormatRow(label: 'Word',       ext: '.docx',  ok: true),
+              _FormatRow(label: 'PDF',        ext: '.pdf',   ok: true),
+              _FormatRow(label: 'Excel',      ext: '.xlsx',  ok: true),
+            ],
+          ),
+
+          // ── Thông tin ─────────────────────────────────────────────────────
+          _SectionCard(
+            title: 'Thông tin ứng dụng',
+            icon:  Icons.info_outline,
+            children: [
+              _InfoRow(label: 'Phiên bản', value: 'v${AppConstants.appVersion}'),
+              const ListTile(
+                leading:  Icon(Icons.functions_outlined),
+                title:    Text('Hỗ trợ công thức toán'),
+                subtitle: Text('OMML, MathType, LaTeX'),
                 dense:    true,
               ),
-              ListTile(
-                leading:  const Icon(Icons.code_outlined),
-                title:    const Text('Open Source'),
-                subtitle: const Text('MIT License'),
+              const ListTile(
+                leading:  Icon(Icons.image_outlined),
+                title:    Text('Render phương trình WMF'),
+                subtitle: Text('Hiển thị bằng renderer native Android'),
                 dense:    true,
               ),
             ],
@@ -196,57 +134,42 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
-  // ── Actions ───────────────────────────────────────────────────────────────
+  // ── Theme picker ───────────────────────────────────────────────────────────
 
-  Future<void> _clearCache(BuildContext context) async {
-    final ok = await _confirm(
-      context,
-      title:   'Clear Cache?',
-      message: 'Cached documents will be re-parsed on next open.',
-    );
-    if (!ok) return;
-    ref.read(documentCacheProvider).clear();
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Cache cleared')),
-      );
-      setState(() {});
-    }
-  }
-
-  Future<void> _clearHistory(BuildContext context) async {
-    final ok = await _confirm(
-      context,
-      title:   'Clear History?',
-      message: 'All recent files and favorites will be removed.',
-    );
-    if (!ok) return;
-    await ref.read(historyNotifierProvider.notifier).clearAll();
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('History cleared')),
-      );
-    }
-  }
-
-  void _showThemePicker(BuildContext context) {
+  void _showThemePicker(
+      BuildContext context, WidgetRef ref, ThemeMode current) {
     showModalBottomSheet<void>(
       context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
       builder: (_) => Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          const SizedBox(height: 8),
+          Container(
+            width: 36, height: 4,
+            decoration: BoxDecoration(
+              color: Colors.grey.shade400,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
           const Padding(
-            padding: EdgeInsets.all(16),
-            child: Text('Choose Theme',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+            padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text('Chọn chủ đề',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+            ),
           ),
           for (final mode in ThemeMode.values)
             RadioListTile<ThemeMode>(
-              title:    Text(_themeName(mode)),
-              value:    mode,
-              groupValue: _themeMode,
+              title:      Text(_themeName(mode)),
+              value:      mode,
+              groupValue: current,
               onChanged: (v) {
-                setState(() => _themeMode = v!);
+                // Update the GLOBAL provider → MaterialApp rebuilds immediately
+                ref.read(themeModeProvider.notifier).state = v!;
                 Navigator.pop(context);
               },
             ),
@@ -254,6 +177,30 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ],
       ),
     );
+  }
+
+  // ── Actions ────────────────────────────────────────────────────────────────
+
+  Future<void> _clearCache(BuildContext context, WidgetRef ref) async {
+    if (!await _confirm(context,
+        title:   'Xóa bộ nhớ đệm?',
+        message: 'Tài liệu đã lưu sẽ được tải lại lần sau.')) return;
+    ref.read(documentCacheProvider).clear();
+    if (context.mounted) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Đã xóa bộ nhớ đệm')));
+    }
+  }
+
+  Future<void> _clearHistory(BuildContext context, WidgetRef ref) async {
+    if (!await _confirm(context,
+        title:   'Xóa lịch sử?',
+        message: 'Tất cả tài liệu gần đây và yêu thích sẽ bị xóa.')) return;
+    await ref.read(historyNotifierProvider.notifier).clearAll();
+    if (context.mounted) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Đã xóa lịch sử')));
+    }
   }
 
   Future<bool> _confirm(BuildContext context,
@@ -265,26 +212,26 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         content: Text(message),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Hủy')),
           FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Clear'),
-          ),
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Xóa')),
         ],
       ),
     );
     return result == true;
   }
 
-  String _themeName(ThemeMode m) => switch (m) {
-        ThemeMode.system => 'System default',
-        ThemeMode.light  => 'Light',
-        ThemeMode.dark   => 'Dark',
+  // ── Helpers ────────────────────────────────────────────────────────────────
+
+  static String _themeName(ThemeMode m) => switch (m) {
+        ThemeMode.system => 'Theo hệ thống',
+        ThemeMode.light  => 'Sáng',
+        ThemeMode.dark   => 'Tối',
       };
 
-  String _formatKb(int kb) {
+  static String _formatSize(int kb) {
     if (kb < 1024) return '$kb KB';
     return '${(kb / 1024).toStringAsFixed(1)} MB';
   }
@@ -298,53 +245,40 @@ class _AppHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width:   double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 28),
-      child: Row(
-        children: [
-          Container(
-            width: 56, height: 56,
-            decoration: BoxDecoration(
-              color:        ThemeConstants.primaryBlue,
-              borderRadius: BorderRadius.circular(14),
+      padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
+      child: Row(children: [
+        Container(
+          width: 52, height: 52,
+          decoration: BoxDecoration(
+            color:        ThemeConstants.primaryBlue,
+            borderRadius: BorderRadius.circular(13),
+          ),
+          child: const Icon(Icons.functions, color: Colors.white, size: 28),
+        ),
+        const SizedBox(width: 14),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              AppConstants.appName,
+              style: Theme.of(context)
+                  .textTheme.titleLarge
+                  ?.copyWith(fontWeight: FontWeight.w800),
             ),
-            child: const Icon(Icons.functions, color: Colors.white, size: 30),
-          ),
-          const SizedBox(width: 16),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(AppConstants.appName,
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w800)),
-              const SizedBox(height: 2),
-              Text(
-                'v${AppConstants.appVersion} · Phase 5',
-                style: Theme.of(context).textTheme.bodySmall,
+            const SizedBox(height: 2),
+            Text(
+              'Xem tài liệu Word · PDF · Excel',
+              style: TextStyle(
+                fontSize: 12,
+                color:    ThemeConstants.primaryBlue,
+                fontWeight: FontWeight.w500,
               ),
-              const SizedBox(height: 4),
-              Text(
-                'DOCX · Equations · Math',
-                style: TextStyle(
-                  fontSize:  11,
-                  color:     ThemeConstants.primaryBlue,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
+            ),
+          ],
+        ),
+      ]),
     );
   }
-}
-
-class _SectionHeader extends StatelessWidget {
-  final Widget child;
-  const _SectionHeader({required this.child});
-
-  @override
-  Widget build(BuildContext context) => child;
 }
 
 class _SectionCard extends StatelessWidget {
@@ -361,34 +295,30 @@ class _SectionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
             padding: const EdgeInsets.only(left: 4, bottom: 6),
-            child: Row(
-              children: [
-                Icon(icon, size: 16,
-                    color: ThemeConstants.primaryBlue.withValues(alpha: 0.8)),
-                const SizedBox(width: 6),
-                Text(
-                  title.toUpperCase(),
-                  style: TextStyle(
-                    fontSize:      11,
-                    fontWeight:    FontWeight.w700,
-                    letterSpacing: 1.1,
-                    color:         Theme.of(context)
-                        .colorScheme
-                        .onSurface
-                        .withValues(alpha: 0.6),
-                  ),
+            child: Row(children: [
+              Icon(icon, size: 14,
+                  color: ThemeConstants.primaryBlue.withValues(alpha: 0.8)),
+              const SizedBox(width: 5),
+              Text(
+                title.toUpperCase(),
+                style: TextStyle(
+                  fontSize:      10,
+                  fontWeight:    FontWeight.w700,
+                  letterSpacing: 1.1,
+                  color:         Theme.of(context)
+                      .colorScheme.onSurface.withValues(alpha: 0.55),
                 ),
-              ],
-            ),
+              ),
+            ]),
           ),
           Card(
-            margin:      EdgeInsets.zero,
+            margin: EdgeInsets.zero,
             child: Column(children: children),
           ),
         ],
@@ -397,11 +327,10 @@ class _SectionCard extends StatelessWidget {
   }
 }
 
-class _StatRow extends StatelessWidget {
+class _InfoRow extends StatelessWidget {
   final String label;
   final String value;
-
-  const _StatRow({required this.label, required this.value});
+  const _InfoRow({required this.label, required this.value});
 
   @override
   Widget build(BuildContext context) => Padding(
@@ -410,30 +339,64 @@ class _StatRow extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(label, style: Theme.of(context).textTheme.bodyMedium),
-            Text(
-              value,
-              style: TextStyle(
-                fontSize:   14,
-                fontWeight: FontWeight.w600,
-                color:      ThemeConstants.primaryBlue,
-              ),
-            ),
+            Text(value,
+                style: TextStyle(
+                  fontSize:   13,
+                  fontWeight: FontWeight.w600,
+                  color:      ThemeConstants.primaryBlue,
+                )),
           ],
         ),
       );
 }
 
-class _FormatDot extends StatelessWidget {
-  final bool supported;
-  const _FormatDot({required this.supported});
+class _ActionButton extends StatelessWidget {
+  final String   label;
+  final IconData icon;
+  final VoidCallback onTap;
+  const _ActionButton(
+      {required this.label, required this.icon, required this.onTap});
 
   @override
-  Widget build(BuildContext context) => Container(
-        width: 10, height: 10,
-        decoration: BoxDecoration(
-          color:  supported ? Colors.green : Colors.grey.shade400,
-          shape:  BoxShape.circle,
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+        child: OutlinedButton.icon(
+          onPressed: onTap,
+          icon:  Icon(icon, size: 17),
+          label: Text(label),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: Theme.of(context).colorScheme.error,
+            side: BorderSide(
+                color: Theme.of(context)
+                    .colorScheme.error.withValues(alpha: 0.5)),
+          ),
         ),
       );
 }
 
+class _FormatRow extends StatelessWidget {
+  final String label;
+  final String ext;
+  final bool   ok;
+  const _FormatRow({required this.label, required this.ext, required this.ok});
+
+  @override
+  Widget build(BuildContext context) => ListTile(
+        leading: Container(
+          width: 9, height: 9,
+          decoration: BoxDecoration(
+            color: ok ? Colors.green : Colors.grey.shade400,
+            shape: BoxShape.circle,
+          ),
+        ),
+        title:    Text(label),
+        trailing: Text(ext,
+            style: TextStyle(
+              fontSize:   12,
+              color:      Theme.of(context)
+                  .colorScheme.onSurface.withValues(alpha: 0.5),
+              fontFamily: 'monospace',
+            )),
+        dense: true,
+      );
+}

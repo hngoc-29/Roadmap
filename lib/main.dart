@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/constants/app_constants.dart';
 import 'data/parsers/parser_registry.dart';
 import 'presentation/providers/service_providers.dart';
+import 'presentation/providers/theme_provider.dart';
 import 'presentation/screens/home/home_screen.dart';
 import 'presentation/screens/viewer/viewer_screen.dart';
 import 'presentation/theme/app_theme.dart';
@@ -104,7 +105,7 @@ class _FormulaDocAppState extends ConsumerState<FormulaDocApp> {
       debugShowCheckedModeBanner: false,
       theme:      AppTheme.light,
       darkTheme:  AppTheme.dark,
-      themeMode:  ThemeMode.system,
+      themeMode:  ref.watch(themeModeProvider),
       home:       const HomeScreen(),
     );
   }
