@@ -374,10 +374,12 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
                       data: AppTheme.light,
                       child: Container(
                         color: ThemeConstants.paperLight,
-                        child: DocumentRendererWidget(
-                          model:            state.model!,
-                          scrollController: _scrollController,
-                          onLinkTap:        _handleLinkTap,
+                        child: SelectionArea(
+                          child: DocumentRendererWidget(
+                            model:            state.model!,
+                            scrollController: _scrollController,
+                            onLinkTap:        _handleLinkTap,
+                          ),
                         ),
                       ),
                     ),
@@ -454,11 +456,11 @@ class _ViewerAppBar extends ConsumerWidget implements PreferredSizeWidget {
         // Search toggle
         if (state.isLoaded)
           IconButton(
-            icon:     Icon(
+            icon: Icon(
               searchState.isOpen ? Icons.search_off : Icons.search,
               color: searchState.isOpen ? Colors.orange.shade200 : null,
             ),
-            tooltip:  'Search in document',
+            tooltip:  'Tìm kiếm',
             onPressed: onSearch,
           ),
 
@@ -466,7 +468,7 @@ class _ViewerAppBar extends ConsumerWidget implements PreferredSizeWidget {
         if (state.isLoaded) ...[
           IconButton(
             icon:      const Icon(Icons.zoom_out, size: 20),
-            tooltip:   'Zoom out',
+            tooltip:   'Thu nhỏ',
             onPressed: currentZoom > AppConstants.minZoom ? onZoomOut : null,
           ),
           GestureDetector(
@@ -483,7 +485,7 @@ class _ViewerAppBar extends ConsumerWidget implements PreferredSizeWidget {
           ),
           IconButton(
             icon:      const Icon(Icons.zoom_in, size: 20),
-            tooltip:   'Zoom in',
+            tooltip:   'Phóng to',
             onPressed: currentZoom < AppConstants.maxZoom ? onZoomIn : null,
           ),
         ],
@@ -491,7 +493,7 @@ class _ViewerAppBar extends ConsumerWidget implements PreferredSizeWidget {
         // Warnings badge
         if (state.isLoaded && state.model != null && state.model!.hasWarnings)
           IconButton(
-            tooltip:   '${state.model!.parseWarnings.length} parse warning(s)',
+            tooltip: '${state.model!.parseWarnings.length} cảnh báo',
             icon: Badge(
               label: Text('${state.model!.parseWarnings.length}'),
               child: const Icon(Icons.warning_amber_outlined),

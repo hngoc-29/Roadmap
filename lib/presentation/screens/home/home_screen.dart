@@ -101,8 +101,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _openFilePicker,
         icon: const Icon(Icons.folder_open_outlined),
-        label: const Text('Open File'),
-        tooltip: 'Open a .docx file from storage',
+        label: const Text('Mở tài liệu'),
+        tooltip: 'Mở file từ thiết bị',
       ),
     );
   }
@@ -125,7 +125,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       actions: [
         IconButton(
           icon:     const Icon(Icons.settings_outlined),
-          tooltip:  'Settings',
+          tooltip:  'Cài đặt',
           onPressed: () => Navigator.of(context).push(
             MaterialPageRoute<void>(builder: (_) => const SettingsScreen()),
           ),
@@ -141,7 +141,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 controller: _searchController,
                 onChanged: (v) => setState(() => _searchQuery = v.trim()),
                 decoration: InputDecoration(
-                  hintText: 'Search recent files…',
+                  hintText: 'Tìm trong lịch sử…',
                   prefixIcon: const Icon(Icons.search, size: 20),
                   suffixIcon: _searchQuery.isNotEmpty
                       ? IconButton(
@@ -160,7 +160,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               indicatorColor: Colors.white,
               labelColor: Colors.white,
               unselectedLabelColor: Colors.white60,
-              tabs: const [Tab(text: 'Recent'), Tab(text: 'Favorites')],
+              tabs: const [Tab(text: 'Gần đây'), Tab(text: 'Yêu thích')],
             ),
           ],
         ),

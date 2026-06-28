@@ -22,14 +22,18 @@ class HistoryService {
 
   Future<List<FileRecord>> getRecent({int limit = 20}) async {
     final all = await _repository.loadAll();
-    // Filter out files that no longer exist on disk
-    final existing = all.where((r) => _fileExists(r.path)).toList();
-    return existing.take(limit).toList();
+    // We intentionally do NOT filter by _fileExists here.
+    // Files opened via "Open With" are stored in a temp cache that is still
+    // accessible during the session that wrote the record, but the path may
+    // not survive between sessions on some devices.  Removing the existence
+    // check keeps PDF / XLSX intent entries visible in history; a "File not
+    // found" error is shown when the user taps a stale entry.
+    return all.take(limit).toList();
   }
 
   Future<List<FileRecord>> getFavorites() async {
     final all = await _repository.loadAll();
-    return all.where((r) => r.isFavorite && _fileExists(r.path)).toList();
+    return all.where((r) => r.isFavorite).toList();
   }
 
   // ── Mutations ─────────────────────────────────────────────────────────────

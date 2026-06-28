@@ -23,6 +23,7 @@ class RecentFileCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final ext    = record.name.split('.').last.toLowerCase();
 
     return Card(
       child: InkWell(
@@ -34,19 +35,19 @@ class RecentFileCard extends StatelessWidget {
             children: [
               // ── File icon ─────────────────────────────────────────────────
               Container(
-                width: 44,
-                height: 44,
+                width: 44, height: 44,
                 decoration: BoxDecoration(
-                  color: ThemeConstants.primaryBlue.withValues(alpha: 0.12),
+                  color:        _iconColor(ext).withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(ThemeConstants.radiusSm),
                 ),
-                child: const Center(
+                child: Center(
                   child: Text(
-                    'W',
+                    _iconLabel(ext),
                     style: TextStyle(
-                      fontSize: 20,
+                      fontSize:   ext == 'pdf' ? 12 : 18,
                       fontWeight: FontWeight.w800,
-                      color: ThemeConstants.primaryBlue,
+                      color:      _iconColor(ext),
+                      letterSpacing: ext == 'pdf' ? 0.5 : 0,
                     ),
                   ),
                 ),
@@ -122,47 +123,32 @@ class RecentFileCard extends StatelessWidget {
                     : 'Add to favorites',
               ),
               PopupMenuButton<_Action>(
-                icon: Icon(
-                  Icons.more_vert,
-                  size: 20,
-                  color: Theme.of(context)
-                      .colorScheme
-                      .onSurface
-                      .withValues(alpha: 0.5),
-                ),
+                icon: Icon(Icons.more_vert, size: 20,
+                    color: Theme.of(context)
+                        .colorScheme.onSurface.withValues(alpha: 0.5)),
                 itemBuilder: (_) => [
-                  PopupMenuItem(
+                  const PopupMenuItem(
                     value: _Action.open,
-                    child: const Row(
-                      children: [
-                        Icon(Icons.open_in_new, size: 18),
-                        SizedBox(width: 10),
-                        Text('Open'),
-                      ],
-                    ),
+                    child: Row(children: [
+                      Icon(Icons.open_in_new, size: 18),
+                      SizedBox(width: 10),
+                      Text('Mở'),
+                    ]),
                   ),
                   PopupMenuItem(
                     value: _Action.remove,
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.delete_outline,
-                          size: 18,
-                          color: Theme.of(context).colorScheme.error,
-                        ),
-                        const SizedBox(width: 10),
-                        Text(
-                          'Remove from history',
+                    child: Row(children: [
+                      Icon(Icons.delete_outline, size: 18,
+                          color: Theme.of(context).colorScheme.error),
+                      const SizedBox(width: 10),
+                      Text('Xóa khỏi lịch sử',
                           style: TextStyle(
-                            color: Theme.of(context).colorScheme.error,
-                          ),
-                        ),
-                      ],
-                    ),
+                              color: Theme.of(context).colorScheme.error)),
+                    ]),
                   ),
                 ],
                 onSelected: (action) {
-                  if (action == _Action.open) onTap();
+                  if (action == _Action.open)   onTap();
                   if (action == _Action.remove) onRemove();
                 },
               ),
@@ -174,16 +160,30 @@ class RecentFileCard extends StatelessWidget {
   }
 
   String _formatDate(DateTime dt) {
-    final now = DateTime.now();
+    final now  = DateTime.now();
     final diff = now.difference(dt);
-
-    if (diff.inMinutes < 1) return 'Just now';
-    if (diff.inHours < 1) return '${diff.inMinutes}m ago';
-    if (diff.inDays < 1) return '${diff.inHours}h ago';
-    if (diff.inDays == 1) return 'Yesterday';
-    if (diff.inDays < 7) return '${diff.inDays} days ago';
-    return DateFormat('MMM d, y').format(dt);
+    if (diff.inMinutes < 1) return 'Vừa xong';
+    if (diff.inHours   < 1) return '${diff.inMinutes} phút trước';
+    if (diff.inDays    < 1) return '${diff.inHours} giờ trước';
+    if (diff.inDays   == 1) return 'Hôm qua';
+    if (diff.inDays    < 7) return '${diff.inDays} ngày trước';
+    return DateFormat('dd/MM/yyyy').format(dt);
   }
-}
 
+  static String _iconLabel(String ext) => switch (ext) {
+    'pdf'              => 'PDF',
+    'xlsx' || 'xls'   => 'XLS',
+    'pptx' || 'ppt'   => 'PPT',
+    _                  => 'W',   // docx / doc
+  };
+
+  static Color _iconColor(String ext) => switch (ext) {
+    'pdf'              => const Color(0xFFE53935),  // red
+    'xlsx' || 'xls'   => const Color(0xFF1E8E3E),  // green
+    'pptx' || 'ppt'   => const Color(0xFFE65100),  // orange
+    _                  => ThemeConstants.primaryBlue,
+  };
+
+enum _Action { open, remove }
+}
 enum _Action { open, remove }
