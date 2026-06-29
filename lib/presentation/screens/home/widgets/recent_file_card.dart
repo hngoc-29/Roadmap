@@ -183,7 +183,6 @@ class RecentFileCard extends StatelessWidget {
     'pptx' || 'ppt'   => const Color(0xFFE65100),  // orange
     _                  => ThemeConstants.primaryBlue,
   };
-
-enum _Action { open, remove }
 }
+
 enum _Action { open, remove }
