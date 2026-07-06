@@ -92,7 +92,7 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
     if (widget.source != null) {
       await notifier.open(widget.source!);
     } else if (widget.filePath != null) {
-      await notifier.openFromPath(widget.filePath!);
+      await notifier.open(FileDocumentSource(widget.filePath!));
     }
 
     // Bind model to search notifier
@@ -206,7 +206,7 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
     final path  = state.currentFilePath;
     if (path == null) return;
     try {
-      await ShareXFiles([XFile(path)],
+      await Share.shareXFiles([XFile(path)],
           subject: state.currentFileName ?? 'Tài liệu');
     } catch (_) {
       if (mounted) {
@@ -445,7 +445,7 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
             child: Stack(
               children: [
                 if (state.isLoaded && state.model != null)
-                  _buildDocumentView(context, state),
+                  _buildDocumentView(context, state, fontSize),
                 if (state.isInitial)
                   const Center(child: CircularProgressIndicator()),
                 if (state.isLoading)
@@ -480,7 +480,7 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
     );
   }
 
-  Widget _buildDocumentView(BuildContext context, DocumentState state) {
+  Widget _buildDocumentView(BuildContext context, DocumentState state, double fontSize) {
     // ── Listener tracks active pointer count ────────────────────────────────
     // We use raw pointer events (not GestureDetector) so we can reliably
     // count fingers without fighting the gesture arena.
