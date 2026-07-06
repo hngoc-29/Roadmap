@@ -20,6 +20,8 @@ dependencies:
   xml: ^7.0.1
   # PDF rendering — native platform renderer (Android PdfRenderer, iOS PDFKit)
   pdfx: ^2.8.1
+  # Share files via system share sheet
+  share_plus: ^10.1.4
 
   # ── File handling ─────────────────────────────────────────────────────────
   # Device temp/app directories for caching

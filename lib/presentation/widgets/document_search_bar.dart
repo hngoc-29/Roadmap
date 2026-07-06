@@ -216,18 +216,36 @@ class _SearchBarContent extends StatelessWidget {
                 ),
               ),
 
+            // ── Aa toggle (case-sensitive) ────────────────────────────────
+            _SearchToggle(
+              label:   'Aa',
+              active:  searchState.caseSensitive,
+              tooltip: 'Phân biệt hoa/thường',
+              onTap:   () => ref.read(searchNotifierProvider.notifier)
+                  .toggleCaseSensitive(),
+            ),
+
+            // ── W toggle (whole word) ─────────────────────────────────────
+            _SearchToggle(
+              label:   'W',
+              active:  searchState.wholeWord,
+              tooltip: 'Toàn từ',
+              onTap:   () => ref.read(searchNotifierProvider.notifier)
+                  .toggleWholeWord(),
+            ),
+
             // ── Navigation buttons ────────────────────────────────────────
             IconButton(
               icon:     const Icon(Icons.keyboard_arrow_up, size: 20),
               onPressed: searchState.hasResults ? onPrev : null,
-              tooltip:  'Previous match',
+              tooltip:  'Kết quả trước',
               padding:  EdgeInsets.zero,
               constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
             ),
             IconButton(
               icon:     const Icon(Icons.keyboard_arrow_down, size: 20),
               onPressed: searchState.hasResults ? onNext : null,
-              tooltip:  'Next match',
+              tooltip:  'Kết quả tiếp',
               padding:  EdgeInsets.zero,
               constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
             ),
@@ -236,7 +254,7 @@ class _SearchBarContent extends StatelessWidget {
             IconButton(
               icon:     const Icon(Icons.close, size: 20),
               onPressed: onClose,
-              tooltip:  'Close search',
+              tooltip:  'Đóng tìm kiếm',
               padding:  EdgeInsets.zero,
               constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
             ),
@@ -245,4 +263,48 @@ class _SearchBarContent extends StatelessWidget {
       ),
     );
   }
+}
+
+// ── Toggle button ─────────────────────────────────────────────────────────────
+
+class _SearchToggle extends StatelessWidget {
+  final String       label;
+  final bool         active;
+  final String       tooltip;
+  final VoidCallback onTap;
+  const _SearchToggle({
+    required this.label, required this.active,
+    required this.tooltip, required this.onTap,
+  });
+  @override
+  Widget build(BuildContext context) => Tooltip(
+    message: tooltip,
+    child: GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        margin:  const EdgeInsets.symmetric(horizontal: 2),
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+        decoration: BoxDecoration(
+          color: active
+              ? ThemeConstants.primaryBlue.withValues(alpha: 0.18)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(5),
+          border: Border.all(
+            color: active ? ThemeConstants.primaryBlue : Colors.transparent,
+            width: 1,
+          ),
+        ),
+        child: Text(label,
+          style: TextStyle(
+            fontSize:   12,
+            fontWeight: FontWeight.w700,
+            color: active
+                ? ThemeConstants.primaryBlue
+                : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.55),
+          ),
+        ),
+      ),
+    ),
+  );
 }

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../../../core/constants/theme_constants.dart';
-import '../../../data/models/document_block.dart';
-import '../../../data/models/document_model.dart';
+import '../../../../core/constants/theme_constants.dart';
+import '../../../../data/models/document_block.dart';
+import '../../../../data/models/document_model.dart';
 
 /// Sliding drawer that lists all [HeadingBlock]s in the document.
 /// Tapping a heading calls [onJump] with the heading's index in the block list,

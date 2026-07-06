@@ -14,12 +14,16 @@ class SearchState {
   final String query;
   final List<SearchResult> results;
   final int    currentIndex;
+  final bool   caseSensitive;
+  final bool   wholeWord;
 
   const SearchState({
-    this.isOpen       = false,
-    this.query        = '',
-    this.results      = const [],
-    this.currentIndex = 0,
+    this.isOpen        = false,
+    this.query         = '',
+    this.results       = const [],
+    this.currentIndex  = 0,
+    this.caseSensitive = false,
+    this.wholeWord     = false,
   });
 
   // ── Derived ───────────────────────────────────────────────────────────────
@@ -55,7 +59,7 @@ class SearchState {
 
   String get statusText {
     if (!isOpen || query.isEmpty) return '';
-    if (results.isEmpty) return 'No results';
+    if (results.isEmpty) return 'Không tìm thấy';
     return '${_safeIndex + 1} / ${results.length}';
   }
 
@@ -64,12 +68,16 @@ class SearchState {
     String? query,
     List<SearchResult>? results,
     int?    currentIndex,
+    bool?   caseSensitive,
+    bool?   wholeWord,
   }) {
     return SearchState(
-      isOpen:       isOpen       ?? this.isOpen,
-      query:        query        ?? this.query,
-      results:      results      ?? this.results,
-      currentIndex: currentIndex ?? this.currentIndex,
+      isOpen:        isOpen        ?? this.isOpen,
+      query:         query         ?? this.query,
+      results:       results       ?? this.results,
+      currentIndex:  currentIndex  ?? this.currentIndex,
+      caseSensitive: caseSensitive ?? this.caseSensitive,
+      wholeWord:     wholeWord     ?? this.wholeWord,
     );
   }
 }
@@ -124,6 +132,16 @@ class SearchNotifier extends StateNotifier<SearchState> {
     state = state.copyWith(currentIndex: prev);
   }
 
+  void toggleCaseSensitive() {
+    state = state.copyWith(caseSensitive: !state.caseSensitive);
+    _runSearch();
+  }
+
+  void toggleWholeWord() {
+    state = state.copyWith(wholeWord: !state.wholeWord);
+    _runSearch();
+  }
+
   // ── Internal ──────────────────────────────────────────────────────────────
 
   void _runSearch() {
@@ -133,7 +151,11 @@ class SearchNotifier extends StateNotifier<SearchState> {
     }
     final results = _svc.search(
       _model!,
-      SearchQuery(term: state.query),
+      SearchQuery(
+        term:          state.query,
+        caseSensitive: state.caseSensitive,
+        wholeWord:     state.wholeWord,
+      ),
     );
     state = state.copyWith(results: results, currentIndex: 0);
   }
