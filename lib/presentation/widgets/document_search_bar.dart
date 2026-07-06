@@ -118,7 +118,7 @@ class _DocumentSearchBarState extends ConsumerState<DocumentSearchBar>
 
 // ─── Bar content ──────────────────────────────────────────────────────────────
 
-class _SearchBarContent extends StatelessWidget {
+class _SearchBarContent extends ConsumerWidget {
   final TextEditingController controller;
   final FocusNode focusNode;
   final SearchState searchState;
@@ -138,7 +138,8 @@ class _SearchBarContent extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
     final isDark   = Theme.of(context).brightness == Brightness.dark;
     final barColor = isDark ? const Color(0xFF1A2340) : Colors.white;
     final noMatch  = searchState.query.isNotEmpty && !searchState.hasResults;

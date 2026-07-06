@@ -22,7 +22,7 @@ class TocDrawer extends StatelessWidget {
       if (b is HeadingBlock) {
         headings.add(_TocEntry(
           index: i,
-          level: b.level,
+          level: b.level.index + 1,  // HeadingLevel.h1=0 → level 1, h2=1 → level 2, …
           text:  b.runs.map((r) => r.text).join(),
         ));
       }
