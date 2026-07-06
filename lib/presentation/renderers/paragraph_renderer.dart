@@ -8,15 +8,15 @@ import 'text_run_builder.dart';
 class ParagraphRenderer extends StatelessWidget {
   final ParagraphBlock block;
   final void Function(String url)? onLinkTap;
-
-  /// Phase 4: character-range highlights from the search provider.
   final List<SearchHighlight> highlights;
+  final double baseFontSize;
 
   const ParagraphRenderer({
     super.key,
     required this.block,
     this.onLinkTap,
-    this.highlights = const [],
+    this.highlights   = const [],
+    this.baseFontSize = 16.0,
   });
 
   @override
@@ -27,6 +27,7 @@ class ParagraphRenderer extends StatelessWidget {
       block.runs,
       context,
       highlights,
+      defaultStyle: TextStyle(fontSize: baseFontSize),
       onLinkTap: onLinkTap,
     );
 

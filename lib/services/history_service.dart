@@ -105,8 +105,22 @@ class HistoryService {
     }
   }
 
-  /// Generates a stable ID from the file path (consistent across reopens).
+  /// Generates a stable ID for a file.
+  ///
+  /// Android content URIs (`content://…`) are session-scoped and change
+  /// between app launches, so using `path.hashCode` as the key creates
+  /// duplicate history entries for the same physical file.
+  ///
+  /// Strategy:
+  ///   • Regular file paths (`/storage/…`) → hash the path directly.
+  ///   • Content URIs (`content://…`) → hash the last path segment (file
+  ///     name) combined with file size, which stays stable across sessions.
   String _generateId(String path) {
+    if (path.startsWith('content://')) {
+      final name = path.split('/').last.split('%2F').last;
+      final size = _sizeOf(path) ?? 0;
+      return 'rec_${(name + size.toString()).hashCode.abs()}';
+    }
     return 'rec_${path.hashCode.abs()}';
   }
 }

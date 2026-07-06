@@ -38,7 +38,7 @@ class ViewerErrorWidget extends StatelessWidget {
             ),
             const SizedBox(height: 20),
             Text(
-              'Could Not Open Document',
+              'Không thể mở tài liệu',
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.w700,
                   ),
@@ -60,14 +60,14 @@ class ViewerErrorWidget extends StatelessWidget {
               FilledButton.icon(
                 onPressed: onRetry,
                 icon: const Icon(Icons.refresh),
-                label: const Text('Try Again'),
+                label: const Text('Thử lại'),
               ),
             if (onPickAnother != null) ...[
               const SizedBox(height: 10),
               OutlinedButton.icon(
                 onPressed: onPickAnother,
                 icon: const Icon(Icons.folder_open_outlined),
-                label: const Text('Open Another File'),
+                label: const Text('Mở file khác'),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: ThemeConstants.primaryBlue,
                 ),

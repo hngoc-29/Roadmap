@@ -32,12 +32,14 @@ class DocumentRendererWidget extends ConsumerWidget {
   final DocumentModel  model;
   final ScrollController? scrollController;
   final void Function(String url)? onLinkTap;
+  final double baseFontSize;
 
   const DocumentRendererWidget({
     super.key,
     required this.model,
     this.scrollController,
     this.onLinkTap,
+    this.baseFontSize = 16.0,
   });
 
   @override
@@ -68,11 +70,16 @@ class DocumentRendererWidget extends ConsumerWidget {
     try {
       return switch (block) {
         ParagraphBlock()  => ParagraphRenderer(
-            block:      block,
-            onLinkTap:  onLinkTap,
-            highlights: highlights,
+            block:        block,
+            onLinkTap:    onLinkTap,
+            highlights:   highlights,
+            baseFontSize: baseFontSize,
           ),
-        HeadingBlock()    => HeadingRenderer(block: block, highlights: highlights),
+        HeadingBlock()    => HeadingRenderer(
+            block:        block,
+            highlights:   highlights,
+            baseFontSize: baseFontSize,
+          ),
         PageBreakBlock()  => const _PageBreakWidget(),
         EquationBlock()   => EquationRenderer(block: block),
         ImageBlock()      => _ImageWidget(block: block, images: model.images),

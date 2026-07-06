@@ -5,6 +5,7 @@ import '../../../core/constants/app_constants.dart';
 import '../../../core/constants/theme_constants.dart';
 import '../../providers/history_provider.dart';
 import '../../providers/service_providers.dart';
+import '../../providers/font_size_provider.dart';
 import '../../providers/theme_provider.dart';
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -41,6 +42,63 @@ class SettingsScreen extends ConsumerWidget {
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => _showThemePicker(context, ref, themeMode),
               ),
+              // ── Font size slider ──────────────────────────────────────────
+              Consumer(builder: (context, ref, _) {
+                final fontSize = ref.watch(fontSizeProvider);
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Cỡ chữ tài liệu'),
+                          Text(
+                            '${fontSize.round()}pt',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              color:      ThemeConstants.primaryBlue,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Slider(
+                      value:    fontSize,
+                      min:      kMinFontSize,
+                      max:      kMaxFontSize,
+                      divisions: ((kMaxFontSize - kMinFontSize) / 1).round(),
+                      label:    '${fontSize.round()}pt',
+                      onChanged: (v) =>
+                          ref.read(fontSizeProvider.notifier).setSize(v),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('A', style: TextStyle(
+                            fontSize: kMinFontSize,
+                            color: Theme.of(context).colorScheme.onSurface
+                                .withValues(alpha: 0.45),
+                          )),
+                          TextButton(
+                            onPressed: () =>
+                                ref.read(fontSizeProvider.notifier).reset(),
+                            child: const Text('Đặt lại'),
+                          ),
+                          Text('A', style: TextStyle(
+                            fontSize: kMaxFontSize * 0.8,
+                            color: Theme.of(context).colorScheme.onSurface
+                                .withValues(alpha: 0.45),
+                          )),
+                        ],
+                      ),
+                    ),
+                  ],
+                );
+              }),
             ],
           ),
 

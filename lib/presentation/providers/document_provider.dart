@@ -92,9 +92,11 @@ class DocumentNotifier extends StateNotifier<DocumentState> {
         );
       }
 
-      // Phase 4: cache check
-      final cache  = _ref.read(documentCacheProvider);
-      final cached = source.path != null ? cache.get(source.path!) : null;
+      // Check cache using normalised key so content:// URIs hit the same
+      // entry across sessions (the raw URI path segment changes each launch).
+      final cache     = _ref.read(documentCacheProvider);
+      final cacheKey  = _cacheKey(source);
+      final cached    = cache.get(cacheKey);
 
       DocumentModel model;
       if (cached != null) {
@@ -104,7 +106,7 @@ class DocumentNotifier extends StateNotifier<DocumentState> {
       } else {
         state = state.copyWith(loadingProgress: 0.3);
         model = await parser.parse(source);
-        if (source.path != null) cache.put(source.path!, model);
+        cache.put(cacheKey, model);
       }
 
       state = DocumentState(
@@ -128,19 +130,38 @@ class DocumentNotifier extends StateNotifier<DocumentState> {
       AppLogger.error('Unexpected error', tag: 'DocumentNotifier', error: e);
       state = state.copyWith(
         status:       DocumentStatus.error,
-        errorMessage: 'An unexpected error occurred while opening the document.',
+        errorMessage: 'Không thể mở tài liệu. Vui lòng thử lại.',
       );
     }
   }
 
-  Future<void> openFromPath(String path) => open(FileDocumentSource(path));
+  /// Normalises a file path/URI into a stable cache key.
+  ///
+  /// Android content URIs are session-scoped — the numeric segment changes
+  /// between launches (`content://…/12345` → `content://…/12346`).
+  /// Using the last decoded path component (the filename) as the key keeps
+  /// cache hits consistent across sessions for the same file.
+  static String _cacheKey(DocumentSource source) {
+    final path = source.path;
+    if (path == null) return source.name;
+    if (path.startsWith('content://')) {
+      // Decode URL-encoded segments (e.g. %2F → /) and take the last part
+      final decoded = Uri.decodeFull(path);
+      final segment = decoded.split('/').last;
+      return 'content:$segment';
+    }
+    return path;
+  }
 
   Future<void> pickAndOpen() async {
     final source = await _ref.read(fileServiceProvider).pickDocument();
     if (source != null) await open(source);
   }
 
-  void evictFromCache(String path) => _ref.read(documentCacheProvider).evict(path);
+  void evictFromCache(String path) {
+    final key = _cacheKey(FileDocumentSource(path));
+    _ref.read(documentCacheProvider).evict(key);
+  }
 
   void reset()      => state = const DocumentState();
   void clearError() => state = const DocumentState();

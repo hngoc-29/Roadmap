@@ -15,8 +15,14 @@ import 'text_run_builder.dart';
 class HeadingRenderer extends StatelessWidget {
   final HeadingBlock block;
   final List<SearchHighlight> highlights;
+  final double baseFontSize;
 
-  const HeadingRenderer({super.key, required this.block, this.highlights = const []});
+  const HeadingRenderer({
+    super.key,
+    required this.block,
+    this.highlights   = const [],
+    this.baseFontSize = 16.0,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -27,12 +33,13 @@ class HeadingRenderer extends StatelessWidget {
         ? _darkColor(block.level)
         : _lightColor(block.level);
 
-    // Build spans with the heading's base style merged in
+    // Scale heading size relative to baseFontSize (default 16)
+    final scale     = baseFontSize / 16.0;
     final baseStyle = TextStyle(
-      fontSize: config.fontSize,
-      fontWeight: config.fontWeight,
-      color: color,
-      height: 1.3,
+      fontSize:      config.fontSize * scale,
+      fontWeight:    config.fontWeight,
+      color:         color,
+      height:        1.3,
       letterSpacing: config.letterSpacing,
     );
 

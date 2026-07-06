@@ -155,7 +155,7 @@ class OmmlParser {
     if (text.isEmpty) return '';
 
     // Normal text (not math variable) — use \text{} or \mathrm{}
-    if (nor == '1') return '\\text{${_escapeTex(text)}}';
+    if (nor == '1') return _textRun(text);
 
     return _mapText(text, sty, scr);
   }
@@ -512,6 +512,19 @@ class OmmlParser {
         .replaceAll('&', r'\&');
   }
 
+  /// Wraps [text] for use inside LaTeX \text{}.
+  /// flutter_math_fork only supports ASCII in math mode — non-ASCII chars
+  /// (Vietnamese, CJK…) cause a parse error. We detect non-ASCII and embed
+  /// sentinel §P§…§E§ that equation_renderer replaces with a plain Text span.
+  String _textRun(String text) {
+    // The equation renderer displays LaTeX source as monospace text (not
+    // rendered math). For pure ASCII, wrap with \text{} for readability.
+    // For non-ASCII (Vietnamese, etc.), keep the raw Unicode so it renders
+    // correctly in the monospace view without garbled escape sequences.
+    final hasNonAscii = text.codeUnits.any((c) => c > 127);
+    if (!hasNonAscii) return '\\text{${_escapeTex(text)}}';
+    return '\\text{$text}';
+  }
   // ═══════════════════════════════════════════════════════════════════════════
   // XML HELPERS
   // ═══════════════════════════════════════════════════════════════════════════

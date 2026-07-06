@@ -72,7 +72,7 @@ class _ViewerLoadingWidgetState extends State<ViewerLoadingWidget>
             ),
             const SizedBox(height: 24),
             Text(
-              'Opening document…',
+              'Đang mở tài liệu…',
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     color: ThemeConstants.primaryBlue,
                   ),

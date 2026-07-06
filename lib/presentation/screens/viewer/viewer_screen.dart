@@ -3,11 +3,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:collection/collection.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../../core/constants/app_constants.dart';
 import '../../../core/constants/theme_constants.dart';
 import '../../../domain/abstractions/document_source.dart';
 import '../../providers/document_provider.dart';
+import '../../providers/font_size_provider.dart';
 import '../../providers/history_provider.dart';
 import '../../providers/search_provider.dart';
 import '../../providers/service_providers.dart';
@@ -15,6 +17,7 @@ import '../../renderers/document_renderer_widget.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/document_search_bar.dart';
 import '../../widgets/scroll_position_indicator.dart';
+import 'widgets/toc_drawer.dart';
 import 'widgets/viewer_error_widget.dart';
 import 'widgets/viewer_loading_widget.dart';
 
@@ -39,11 +42,13 @@ class ViewerScreen extends ConsumerStatefulWidget {
 class _ViewerScreenState extends ConsumerState<ViewerScreen> {
   late final ScrollController _scrollController;
   final _transformController = TransformationController();
+  final _scaffoldKey         = GlobalKey<ScaffoldState>();
 
   double  _currentZoom    = AppConstants.defaultZoom;
   bool    _showWarnings   = false;
-  String? _currentFileId; // FileRecord.id for history
+  String? _currentFileId;
   Timer?  _scrollSaveTimer;
+  bool    _resumeToastShown = false;
 
   // ── Zoom / gesture tracking ────────────────────────────────────────────────
   // Tracks how many fingers are currently on screen so we can switch between
@@ -142,17 +147,30 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
 
     if (record == null || record.lastScrollPosition < 0.02) return;
 
-    // Wait for the ListView to lay out before scrolling
+    // ListView with images may not have its full extent on the first frame.
+    // We retry up to 10 times (every 100 ms) until maxScrollExtent > 0.
+    _scrollRestoreWithRetry(record.lastScrollPosition, retries: 10);
+  }
+
+  void _scrollRestoreWithRetry(double fraction, {required int retries}) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!_scrollController.hasClients) return;
-      final maxScroll = _scrollController.position.maxScrollExtent;
-      final target    = (record.lastScrollPosition * maxScroll).clamp(0.0, maxScroll);
+      if (!mounted || !_scrollController.hasClients) return;
+      final max = _scrollController.position.maxScrollExtent;
+      if (max <= 0 && retries > 0) {
+        // Not rendered yet — try again after a short delay
+        Future.delayed(const Duration(milliseconds: 100), () {
+          _scrollRestoreWithRetry(fraction, retries: retries - 1);
+        });
+        return;
+      }
+      final target = (fraction * max).clamp(0.0, max);
       if (target > 10) {
         _scrollController.animateTo(
           target,
           duration: const Duration(milliseconds: 400),
           curve:    Curves.easeOut,
         );
+        _showResumeToast(fraction);
       }
     });
   }
@@ -165,7 +183,165 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
     _transformController.value = Matrix4.diagonal3Values(clamped, clamped, 1);
   }
 
-  // ── Hyperlink handler ─────────────────────────────────────────────────────
+  // ── Table of contents ─────────────────────────────────────────────────────
+
+  void _openToc() => _scaffoldKey.currentState?.openDrawer();
+
+  void _jumpToBlock(int blockIndex) {
+    if (!_scrollController.hasClients) return;
+    // Estimate scroll position: assumes ~60px per block on average
+    final target = (blockIndex * 60.0)
+        .clamp(0.0, _scrollController.position.maxScrollExtent);
+    _scrollController.animateTo(
+      target,
+      duration: const Duration(milliseconds: 400),
+      curve:    Curves.easeInOut,
+    );
+  }
+
+  // ── Share file ────────────────────────────────────────────────────────────
+
+  Future<void> _shareFile() async {
+    final state = ref.read(documentNotifierProvider);
+    final path  = state.currentFilePath;
+    if (path == null) return;
+    try {
+      await ShareXFiles([XFile(path)],
+          subject: state.currentFileName ?? 'Tài liệu');
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Không thể chia sẻ file này')),
+        );
+      }
+    }
+  }
+
+  // ── Favorite ──────────────────────────────────────────────────────────────
+
+  Future<void> _toggleFavorite() async {
+    final state = ref.read(documentNotifierProvider);
+    final path  = state.currentFilePath;
+    if (path == null) return;
+    final histSvc = ref.read(historyServiceProvider);
+    final record  = ref.read(historyNotifierProvider)
+        .recentFiles
+        .where((r) => r.path == path)
+        .firstOrNull;
+    if (record == null) return;
+    await histSvc.toggleFavorite(record.id);
+    await ref.read(historyNotifierProvider.notifier).load();
+    if (mounted) {
+      final isFav = ref.read(historyNotifierProvider)
+          .favorites
+          .any((r) => r.id == record.id);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(isFav ? 'Đã thêm vào yêu thích' : 'Đã xóa khỏi yêu thích'),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 2),
+      ));
+    }
+  }
+
+  // ── Document stats ────────────────────────────────────────────────────────
+
+  void _showStats() {
+    final state = ref.read(documentNotifierProvider);
+    final model = state.model;
+    if (model == null) return;
+
+    final meta = model.metadata;
+    final rows = <_StatRow>[
+      if (meta.title   != null) _StatRow('Tiêu đề',   meta.title!),
+      if (meta.author  != null) _StatRow('Tác giả',   meta.author!),
+      if (meta.subject != null) _StatRow('Chủ đề',    meta.subject!),
+      if (meta.created != null) _StatRow('Tạo lúc',
+          '${meta.created!.day}/${meta.created!.month}/${meta.created!.year}'),
+      _StatRow('Số block',        '${model.blocks.length}'),
+      if (model.equationCount > 0)
+        _StatRow('Công thức',     '${model.equationCount}'),
+      if (model.images.isNotEmpty)
+        _StatRow('Hình ảnh',      '${model.images.length}'),
+      if (model.hasWarnings)
+        _StatRow('Cảnh báo',      '${model.parseWarnings.length}'),
+    ];
+
+    showModalBottomSheet<void>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (_) => Padding(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 36, height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+            Text('Thông tin tài liệu',
+                style: Theme.of(context)
+                    .textTheme.titleMedium
+                    ?.copyWith(fontWeight: FontWeight.w700)),
+            const SizedBox(height: 12),
+            ...rows.map((r) => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 5),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    width: 100,
+                    child: Text(r.label,
+                        style: TextStyle(
+                          color: Theme.of(context)
+                              .colorScheme.onSurface.withValues(alpha: 0.6),
+                          fontSize: 13,
+                        )),
+                  ),
+                  Expanded(
+                    child: Text(r.value,
+                        style: const TextStyle(
+                            fontSize: 13, fontWeight: FontWeight.w500)),
+                  ),
+                ],
+              ),
+            )),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Resume toast ──────────────────────────────────────────────────────────
+
+  void _showResumeToast(double fraction) {
+    if (_resumeToastShown) return;
+    _resumeToastShown = true;
+    final pct = (fraction * 100).round();
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text('Tiếp tục từ $pct%'),
+      action: SnackBarAction(
+        label:     'Đầu trang',
+        onPressed: () => _scrollController.animateTo(
+          0,
+          duration: const Duration(milliseconds: 400),
+          curve:    Curves.easeOut,
+        ),
+      ),
+      behavior: SnackBarBehavior.floating,
+      duration: const Duration(seconds: 4),
+    ));
+  }
+
+
 
   Future<void> _handleLinkTap(String url) async {
     final svc = ref.read(hyperlinkServiceProvider);
@@ -173,9 +349,9 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
     if (!ok && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Could not open: $url'),
+          content: Text('Không thể mở: $url'),
           action:  SnackBarAction(
-            label:     'Copy',
+            label:     'Sao chép',
             onPressed: () => svc.copyToClipboard(url),
           ),
           behavior: SnackBarBehavior.floating,
@@ -225,10 +401,17 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
       }
     });
 
+    final fontSize  = ref.watch(fontSizeProvider);
+
     return Scaffold(
-      backgroundColor: Theme.of(context).brightness == Brightness.dark
-          ? ThemeConstants.paperDark
-          : ThemeConstants.paperLight,
+      key:             _scaffoldKey,
+      backgroundColor: ThemeConstants.paperLight,
+      drawer: state.isLoaded && state.model != null
+          ? TocDrawer(
+              model:  state.model!,
+              onJump: _jumpToBlock,
+            )
+          : null,
       body: Column(
         children: [
           // ── AppBar ────────────────────────────────────────────────────────
@@ -248,6 +431,10 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
               ref.read(searchNotifierProvider.notifier).open();
             },
             onWarnings:  () => setState(() => _showWarnings = !_showWarnings),
+            onToc:       _openToc,
+            onShare:     _shareFile,
+            onFavorite:  _toggleFavorite,
+            onStats:     _showStats,
           ),
 
           // ── Phase 4: animated search bar ──────────────────────────────────
@@ -363,9 +550,11 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
               width:  viewW,
               height: viewH,
               child: AbsorbPointer(
-                // Block ListView touch events while panning / zoomed in,
-                // so InteractiveViewer owns the gesture exclusively.
-                absorbing: _panActive,
+                // Only block child touch events during a 2-finger gesture.
+                // Using _panActive (which includes zoom>1) would also block
+                // SelectionArea's long-press, preventing text copy entirely
+                // whenever the document is zoomed in.
+                absorbing: _multiTouch,
                 child: Center(
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(
@@ -379,6 +568,7 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
                             model:            state.model!,
                             scrollController: _scrollController,
                             onLinkTap:        _handleLinkTap,
+                            baseFontSize:     fontSize,
                           ),
                         ),
                       ),
@@ -407,6 +597,10 @@ class _ViewerAppBar extends ConsumerWidget implements PreferredSizeWidget {
   final VoidCallback  onZoomReset;
   final VoidCallback  onSearch;
   final VoidCallback  onWarnings;
+  final VoidCallback  onToc;
+  final VoidCallback  onShare;
+  final VoidCallback  onFavorite;
+  final VoidCallback  onStats;
 
   const _ViewerAppBar({
     required this.state,
@@ -417,6 +611,10 @@ class _ViewerAppBar extends ConsumerWidget implements PreferredSizeWidget {
     required this.onZoomReset,
     required this.onSearch,
     required this.onWarnings,
+    required this.onToc,
+    required this.onShare,
+    required this.onFavorite,
+    required this.onStats,
   });
 
   @override
@@ -489,6 +687,50 @@ class _ViewerAppBar extends ConsumerWidget implements PreferredSizeWidget {
             onPressed: currentZoom < AppConstants.maxZoom ? onZoomIn : null,
           ),
         ],
+
+        // More actions menu
+        if (state.isLoaded)
+          PopupMenuButton<_AppBarAction>(
+            icon: const Icon(Icons.more_vert),
+            onSelected: (action) {
+              switch (action) {
+                case _AppBarAction.toc:      onToc();
+                case _AppBarAction.share:    onShare();
+                case _AppBarAction.favorite: onFavorite();
+                case _AppBarAction.stats:    onStats();
+              }
+            },
+            itemBuilder: (_) => [
+              const PopupMenuItem(
+                value: _AppBarAction.toc,
+                child: Row(children: [
+                  Icon(Icons.list_alt_outlined, size: 18),
+                  SizedBox(width: 12), Text('Mục lục'),
+                ]),
+              ),
+              const PopupMenuItem(
+                value: _AppBarAction.favorite,
+                child: Row(children: [
+                  Icon(Icons.star_outline, size: 18),
+                  SizedBox(width: 12), Text('Thêm yêu thích'),
+                ]),
+              ),
+              const PopupMenuItem(
+                value: _AppBarAction.share,
+                child: Row(children: [
+                  Icon(Icons.share_outlined, size: 18),
+                  SizedBox(width: 12), Text('Chia sẻ'),
+                ]),
+              ),
+              const PopupMenuItem(
+                value: _AppBarAction.stats,
+                child: Row(children: [
+                  Icon(Icons.info_outline, size: 18),
+                  SizedBox(width: 12), Text('Thông tin tài liệu'),
+                ]),
+              ),
+            ],
+          ),
 
         // Warnings badge
         if (state.isLoaded && state.model != null && state.model!.hasWarnings)
@@ -567,4 +809,14 @@ class _WarningsPanel extends StatelessWidget {
       ),
     );
   }
+}
+
+// ── Supporting types ──────────────────────────────────────────────────────────
+
+enum _AppBarAction { toc, share, favorite, stats }
+
+class _StatRow {
+  final String label;
+  final String value;
+  const _StatRow(this.label, this.value);
 }

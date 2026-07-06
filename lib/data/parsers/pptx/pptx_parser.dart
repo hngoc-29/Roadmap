@@ -19,8 +19,8 @@ class PptxParser extends DocumentParserInterface {
   @override
   Future<DocumentModel> parse(DocumentSource source) async {
     throw const ParseException(
-      'PowerPoint (.pptx) viewing is planned for a future release.\n'
-      'FormulaDoc currently supports DOCX files.',
+      'Định dạng PowerPoint (.pptx) chưa được hỗ trợ.\n'
+      'FormulaDoc hiện hỗ trợ: Word (.docx), PDF (.pdf), Excel (.xlsx).',
     );
   }
 }
