@@ -38,9 +38,9 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_17
-    }
+    // kotlinOptions {} was removed in Kotlin 2.2 (deprecated since 2.0) —
+    // the replacement `kotlin { compilerOptions {} }` block is declared
+    // below, outside this `android {}` block (see bottom of file).
 
     sourceSets {
         main.java.srcDirs += "src/main/kotlin"
@@ -75,6 +75,15 @@ android {
         resources {
             excludes += ["META-INF/LICENSE", "META-INF/LICENSE.txt", "META-INF/NOTICE"]
         }
+    }
+}
+
+// Replacement for the removed `android { kotlinOptions { jvmTarget = ... } }`
+// DSL (kotlinOptions was deprecated in Kotlin 2.0, fully removed in 2.2).
+// This is now a top-level block, sibling to `android {}`, not nested inside it.
+kotlin {
+    compilerOptions {
+        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
     }
 }
 
