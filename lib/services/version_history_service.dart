@@ -80,7 +80,7 @@ class VersionHistoryService {
     final dir = await _versionsDir();
     if (!await dir.exists()) return const [];
 
-    final prefix = '$safeName__';
+    final prefix = '${safeName}__';
     final matches = <DocVersion>[];
     await for (final entity in dir.list()) {
       if (entity is! File) continue;
