@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../data/models/document_model.dart';
 import '../../data/models/search_result.dart';
@@ -16,6 +17,7 @@ class SearchState {
   final int    currentIndex;
   final bool   caseSensitive;
   final bool   wholeWord;
+  final List<String> recentQueries;
 
   const SearchState({
     this.isOpen        = false,
@@ -24,6 +26,7 @@ class SearchState {
     this.currentIndex  = 0,
     this.caseSensitive = false,
     this.wholeWord     = false,
+    this.recentQueries = const [],
   });
 
   // ── Derived ───────────────────────────────────────────────────────────────
@@ -70,6 +73,7 @@ class SearchState {
     int?    currentIndex,
     bool?   caseSensitive,
     bool?   wholeWord,
+    List<String>? recentQueries,
   }) {
     return SearchState(
       isOpen:        isOpen        ?? this.isOpen,
@@ -78,6 +82,7 @@ class SearchState {
       currentIndex:  currentIndex  ?? this.currentIndex,
       caseSensitive: caseSensitive ?? this.caseSensitive,
       wholeWord:     wholeWord     ?? this.wholeWord,
+      recentQueries: recentQueries ?? this.recentQueries,
     );
   }
 }
@@ -90,7 +95,35 @@ class SearchNotifier extends StateNotifier<SearchState> {
   final DocumentSearchService _svc;
   DocumentModel? _model;
 
-  SearchNotifier(this._svc) : super(const SearchState());
+  static const _kHistoryKey = 'pref_search_history';
+  static const _kMaxHistory = 10;
+
+  SearchNotifier(this._svc) : super(const SearchState()) {
+    _loadHistory();
+  }
+
+  Future<void> _loadHistory() async {
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getStringList(_kHistoryKey) ?? const [];
+    state = state.copyWith(recentQueries: saved);
+  }
+
+  Future<void> _saveToHistory(String query) async {
+    final trimmed = query.trim();
+    if (trimmed.isEmpty) return;
+    final updated = [trimmed, ...state.recentQueries.where((q) => q != trimmed)]
+        .take(_kMaxHistory)
+        .toList();
+    state = state.copyWith(recentQueries: updated);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(_kHistoryKey, updated);
+  }
+
+  Future<void> clearHistory() async {
+    state = state.copyWith(recentQueries: const []);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_kHistoryKey);
+  }
 
   // ── Document binding ──────────────────────────────────────────────────────
 
@@ -113,6 +146,13 @@ class SearchNotifier extends StateNotifier<SearchState> {
     _runSearch();
   }
 
+  /// Call when the user explicitly commits a search (e.g. presses Enter or
+  /// taps a next/prev result) — this is when we persist it to history,
+  /// rather than on every keystroke in updateQuery.
+  void submitQuery() {
+    if (state.query.trim().isNotEmpty) _saveToHistory(state.query);
+  }
+
   void clearQuery() {
     state = state.copyWith(query: '', results: const [], currentIndex: 0);
   }
@@ -121,6 +161,7 @@ class SearchNotifier extends StateNotifier<SearchState> {
 
   void next() {
     if (!state.hasResults) return;
+    submitQuery();
     final next = (state.currentIndex + 1) % state.results.length;
     state = state.copyWith(currentIndex: next);
   }

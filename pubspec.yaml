@@ -22,6 +22,10 @@ dependencies:
   pdfx: ^2.8.1
   # Share files via system share sheet
   share_plus: ^10.1.4
+  # Text-to-speech for "read aloud" feature
+  flutter_tts: ^4.2.0
+  # System print dialog for existing PDF bytes (PDF documents only)
+  printing: ^5.13.4
 
   # ── File handling ─────────────────────────────────────────────────────────
   # Device temp/app directories for caching

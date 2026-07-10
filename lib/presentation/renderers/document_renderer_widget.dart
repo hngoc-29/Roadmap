@@ -33,13 +33,21 @@ class DocumentRendererWidget extends ConsumerWidget {
   final ScrollController? scrollController;
   final void Function(String url)? onLinkTap;
   final double baseFontSize;
+  final double lineSpacing;
+  final double horizontalMargin;
+  final int pdfInitialPage;
+  final void Function(int page)? onPdfPageChanged;
 
   const DocumentRendererWidget({
     super.key,
     required this.model,
     this.scrollController,
     this.onLinkTap,
-    this.baseFontSize = 16.0,
+    this.baseFontSize     = 16.0,
+    this.lineSpacing      = 1.2,
+    this.horizontalMargin = AppConstants.documentHorizontalPadding,
+    this.pdfInitialPage   = 1,
+    this.onPdfPageChanged,
   });
 
   @override
@@ -49,8 +57,8 @@ class DocumentRendererWidget extends ConsumerWidget {
     return ListView.builder(
       controller: scrollController,
       physics:    const BouncingScrollPhysics(),
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppConstants.documentHorizontalPadding,
+      padding: EdgeInsets.symmetric(
+        horizontal: horizontalMargin,
         vertical:   AppConstants.documentVerticalPadding,
       ),
       itemCount: model.blocks.length,
@@ -74,11 +82,13 @@ class DocumentRendererWidget extends ConsumerWidget {
             onLinkTap:    onLinkTap,
             highlights:   highlights,
             baseFontSize: baseFontSize,
+            lineSpacing:  lineSpacing,
           ),
         HeadingBlock()    => HeadingRenderer(
             block:        block,
             highlights:   highlights,
             baseFontSize: baseFontSize,
+            lineSpacing:  lineSpacing + 0.1, // headings keep a touch more room than body text
           ),
         PageBreakBlock()  => const _PageBreakWidget(),
         EquationBlock()   => EquationRenderer(block: block),
@@ -96,7 +106,11 @@ class DocumentRendererWidget extends ConsumerWidget {
             block:     block,
             onLinkTap: onLinkTap,
           ),
-        PdfDocumentBlock()  => _PdfDocumentWidget(block: block),
+        PdfDocumentBlock()  => _PdfDocumentWidget(
+            block:         block,
+            initialPage:   pdfInitialPage,
+            onPageChanged: onPdfPageChanged,
+          ),
         SpreadsheetBlock()  => _SpreadsheetWidget(block: block),
       };
     } catch (e) {
@@ -476,8 +490,10 @@ class _ErrorBlock extends StatelessWidget {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 class _PdfDocumentWidget extends StatefulWidget {
-  const _PdfDocumentWidget({required this.block});
+  const _PdfDocumentWidget({required this.block, this.initialPage = 1, this.onPageChanged});
   final PdfDocumentBlock block;
+  final int initialPage;
+  final void Function(int page)? onPageChanged;
   @override
   State<_PdfDocumentWidget> createState() => _PdfDocumentWidgetState();
 }
@@ -489,7 +505,8 @@ class _PdfDocumentWidgetState extends State<_PdfDocumentWidget> {
   void initState() {
     super.initState();
     _ctrl = PdfController(
-      document: PdfDocument.openData(widget.block.bytes),
+      document:        PdfDocument.openData(widget.block.bytes),
+      initialPage:     widget.initialPage,
     );
   }
 
@@ -502,13 +519,12 @@ class _PdfDocumentWidgetState extends State<_PdfDocumentWidget> {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      // Fill the available height inside the ListView so PdfView has a
-      // bounded constraint to render pages.
       height: MediaQuery.of(context).size.height * 0.85,
       child: PdfView(
         controller: _ctrl,
         scrollDirection: Axis.vertical,
         pageSnapping: false,
+        onPageChanged: widget.onPageChanged,
         backgroundDecoration: const BoxDecoration(color: Color(0xFFF0F0F0)),
         builders: PdfViewBuilders<DefaultBuilderOptions>(
           options: const DefaultBuilderOptions(),
@@ -517,7 +533,7 @@ class _PdfDocumentWidgetState extends State<_PdfDocumentWidget> {
           pageLoaderBuilder: (_) =>
               const Center(child: CircularProgressIndicator(strokeWidth: 2)),
           errorBuilder: (_, e) => Center(
-            child: Text('Cannot render page: $e',
+            child: Text('Không thể render trang: $e',
                 style: const TextStyle(color: Colors.red)),
           ),
         ),

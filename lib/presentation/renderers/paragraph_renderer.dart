@@ -10,6 +10,7 @@ class ParagraphRenderer extends StatelessWidget {
   final void Function(String url)? onLinkTap;
   final List<SearchHighlight> highlights;
   final double baseFontSize;
+  final double lineSpacing;
 
   const ParagraphRenderer({
     super.key,
@@ -17,6 +18,7 @@ class ParagraphRenderer extends StatelessWidget {
     this.onLinkTap,
     this.highlights   = const [],
     this.baseFontSize = 16.0,
+    this.lineSpacing  = 1.2,
   });
 
   @override
@@ -29,6 +31,7 @@ class ParagraphRenderer extends StatelessWidget {
       highlights,
       defaultStyle: TextStyle(fontSize: baseFontSize),
       onLinkTap: onLinkTap,
+      lineHeightMultiplier: lineSpacing,
     );
 
     Widget content = RichText(

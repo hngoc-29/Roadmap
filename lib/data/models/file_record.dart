@@ -17,6 +17,15 @@ class FileRecord {
   /// Fractional scroll position (0.0 = top, 1.0 = bottom) for resume reading.
   final double lastScrollPosition;
 
+  /// Last viewed PDF page number (1-based). 0 = not a PDF or not yet opened.
+  final int lastPdfPage;
+
+  /// Bookmarks: list of block indices the user has bookmarked.
+  final List<int> bookmarks;
+
+  /// Collection IDs this file belongs to.
+  final List<String> collections;
+
   /// Whether the user has starred this document.
   final bool isFavorite;
 
@@ -29,6 +38,9 @@ class FileRecord {
     required this.name,
     required this.lastOpenedAt,
     this.lastScrollPosition = 0.0,
+    this.lastPdfPage = 0,
+    this.bookmarks = const [],
+    this.collections = const [],
     this.isFavorite = false,
     this.fileSizeBytes,
   });
@@ -39,6 +51,9 @@ class FileRecord {
     String? name,
     DateTime? lastOpenedAt,
     double? lastScrollPosition,
+    int? lastPdfPage,
+    List<int>? bookmarks,
+    List<String>? collections,
     bool? isFavorite,
     int? fileSizeBytes,
   }) {
@@ -48,6 +63,9 @@ class FileRecord {
       name: name ?? this.name,
       lastOpenedAt: lastOpenedAt ?? this.lastOpenedAt,
       lastScrollPosition: lastScrollPosition ?? this.lastScrollPosition,
+      lastPdfPage: lastPdfPage ?? this.lastPdfPage,
+      bookmarks: bookmarks ?? this.bookmarks,
+      collections: collections ?? this.collections,
       isFavorite: isFavorite ?? this.isFavorite,
       fileSizeBytes: fileSizeBytes ?? this.fileSizeBytes,
     );
@@ -61,6 +79,9 @@ class FileRecord {
         'name': name,
         'lastOpenedAt': lastOpenedAt.toIso8601String(),
         'lastScrollPosition': lastScrollPosition,
+        'lastPdfPage': lastPdfPage,
+        'bookmarks': bookmarks,
+        'collections': collections,
         'isFavorite': isFavorite,
         'fileSizeBytes': fileSizeBytes,
       };
@@ -72,6 +93,15 @@ class FileRecord {
         lastOpenedAt: DateTime.parse(json['lastOpenedAt'] as String),
         lastScrollPosition:
             (json['lastScrollPosition'] as num?)?.toDouble() ?? 0.0,
+        lastPdfPage: (json['lastPdfPage'] as num?)?.toInt() ?? 0,
+        bookmarks: (json['bookmarks'] as List<dynamic>?)
+                ?.map((e) => (e as num).toInt())
+                .toList() ??
+            const [],
+        collections: (json['collections'] as List<dynamic>?)
+                ?.map((e) => e as String)
+                .toList() ??
+            const [],
         isFavorite: json['isFavorite'] as bool? ?? false,
         fileSizeBytes: json['fileSizeBytes'] as int?,
       );

@@ -417,10 +417,28 @@ final class SpreadsheetBlock extends DocumentBlock {
   final String              sheetName;
   final List<List<String?>> rows;      // rows × cols, null = empty cell
   final int                 colCount;
+
+  /// Intra-ZIP path of the sheet XML this block was parsed from
+  /// (e.g. 'xl/worksheets/sheet1.xml'). Needed to safely write edited cells
+  /// back to the correct sheet without touching any other sheet/file in the
+  /// workbook. Null for blocks not backed by an editable source (shouldn't
+  /// normally happen for XLSX, but kept nullable for safety/back-compat).
+  final String? sourceFilePath;
+
+  /// The ACTUAL 1-based XLSX row number for each entry in [rows].
+  /// XLSX rows can be sparse (an entirely empty row is often omitted from
+  /// the XML), so `rows[i]`'s real row number is not always `i + 1`.
+  /// Writing edits back using the wrong row number would silently corrupt
+  /// a different row than the one the user actually edited, so this must
+  /// be tracked explicitly rather than assumed positionally.
+  final List<int> rowNumbers;
+
   const SpreadsheetBlock({
     required super.id,
     required this.sheetName,
     required this.rows,
     required this.colCount,
+    this.sourceFilePath,
+    this.rowNumbers = const [],
   });
 }

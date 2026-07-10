@@ -19,6 +19,7 @@ class TextRunBuilder {
     BuildContext context, {
     TextStyle?               defaultStyle,
     void Function(String url)? onLinkTap,
+    double lineHeightMultiplier = 1.2,
   }) =>
       buildSpansWithHighlights(
         runs,
@@ -26,6 +27,7 @@ class TextRunBuilder {
         const [],
         defaultStyle: defaultStyle,
         onLinkTap:    onLinkTap,
+        lineHeightMultiplier: lineHeightMultiplier,
       );
 
   /// Phase 4: builds spans with optional character-level highlights.
@@ -38,6 +40,7 @@ class TextRunBuilder {
     List<SearchHighlight> highlights, {
     TextStyle?               defaultStyle,
     void Function(String url)? onLinkTap,
+    double lineHeightMultiplier = 1.2,
   }) {
     final baseColor    = Theme.of(context).colorScheme.onSurface;
     final isDark       = Theme.of(context).brightness == Brightness.dark;
@@ -60,6 +63,7 @@ class TextRunBuilder {
           baseFontSize: baseFontSize,
           isDark:       isDark,
           onLinkTap:    onLinkTap,
+          lineHeightMultiplier: lineHeightMultiplier,
         ));
       } else {
         spans.addAll(_highlightedSpans(
@@ -70,6 +74,7 @@ class TextRunBuilder {
           baseFontSize: baseFontSize,
           isDark:       isDark,
           onLinkTap:    onLinkTap,
+          lineHeightMultiplier: lineHeightMultiplier,
         ));
       }
 
@@ -87,8 +92,10 @@ class TextRunBuilder {
     required double baseFontSize,
     required bool   isDark,
     void Function(String url)? onLinkTap,
+    double lineHeightMultiplier = 1.2,
   }) {
-    final style = _buildStyle(run.style, baseColor, baseFontSize, isDark: isDark);
+    final style = _buildStyle(run.style, baseColor, baseFontSize,
+        isDark: isDark, lineHeightMultiplier: lineHeightMultiplier);
 
     if (run.style.superscript || run.style.subscript) {
       return _scriptSpan(run, style, run.style.fontSizePt ?? baseFontSize);
@@ -115,9 +122,11 @@ class TextRunBuilder {
     required double               baseFontSize,
     required bool                 isDark,
     void Function(String url)?    onLinkTap,
+    double lineHeightMultiplier = 1.2,
   }) {
     final text   = run.text;
-    final base   = _buildStyle(run.style, baseColor, baseFontSize, isDark: isDark);
+    final base   = _buildStyle(run.style, baseColor, baseFontSize,
+        isDark: isDark, lineHeightMultiplier: lineHeightMultiplier);
     final result = <InlineSpan>[];
 
     // Convert to run-local offsets and sort
@@ -183,6 +192,7 @@ class TextRunBuilder {
     Color        baseColor,
     double       baseFontSize, {
     bool isDark = false,
+    double lineHeightMultiplier = 1.2,
   }) {
     // Adapt the document's explicit color so it stays readable.
     // DOCX files often hardcode black (0xFF000000) or white text. In dark mode
@@ -210,8 +220,9 @@ class TextRunBuilder {
         : baseFontSize;
 
     // Line height: Word uses "auto" spacing ≈ 1.15–1.20 of font size.
-    // Using 1.2 gives tighter, more Word-like spacing vs our old 1.4.
-    const lineHeight = 1.2;
+    // Configurable via the reading-preferences "Giãn dòng" slider; defaults
+    // to 1.2 (the previous hardcoded value) when not overridden.
+    final lineHeight = lineHeightMultiplier;
 
     return TextStyle(
       fontWeight:      style.bold      ? FontWeight.bold   : FontWeight.normal,

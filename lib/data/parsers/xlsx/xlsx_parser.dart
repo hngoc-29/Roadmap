@@ -123,16 +123,21 @@ class XlsxParser extends DocumentParserInterface {
       }
 
       List<List<String?>> rows;
+      List<int> rowNumbers;
       try {
-        rows = _parseWorksheet(file.content as List<int>, sharedStrings);
+        final parsed = _parseWorksheet(file.content as List<int>, sharedStrings);
+        rows        = parsed.rows;
+        rowNumbers  = parsed.rowNumbers;
       } catch (e) {
         warnings.add('Sheet "$name" parse error: $e');
         continue;
       }
 
-      // Trim trailing empty rows
+      // Trim trailing empty rows (keep rowNumbers in sync so rows[i] and
+      // rowNumbers[i] always refer to the same physical XLSX row).
       while (rows.isNotEmpty && rows.last.every((c) => c == null || c!.isEmpty)) {
         rows.removeLast();
+        rowNumbers.removeLast();
       }
       if (rows.isEmpty) {
         warnings.add('Sheet "$name" is empty after trimming.');
@@ -142,10 +147,12 @@ class XlsxParser extends DocumentParserInterface {
       final colCount = rows.fold(0, (m, r) => r.length > m ? r.length : m);
 
       blocks.add(SpreadsheetBlock(
-        id:        'sheet_${idx++}',
-        sheetName: name,
-        rows:      rows,
-        colCount:  colCount,
+        id:             'sheet_${idx++}',
+        sheetName:      name,
+        rows:           rows,
+        colCount:       colCount,
+        sourceFilePath: filePath,
+        rowNumbers:     rowNumbers,
       ));
     }
 
@@ -166,14 +173,15 @@ class XlsxParser extends DocumentParserInterface {
 
   // ── Worksheet parser ────────────────────────────────────────────────────────
 
-  List<List<String?>> _parseWorksheet(
+  _ParsedSheet _parseWorksheet(
       List<int> bytes, List<String> sharedStrings) {
     final doc  = XmlDocument.parse(String.fromCharCodes(bytes));
     final rows = <List<String?>>[];
+    final rowNumbers = <int>[];
+    int positionalFallback = 0;
 
     for (final row in doc.findAllElements('row')) {
       final cells = <String?>[];
-      int   lastCol = -1;
 
       for (final c in row.findAllElements('c')) {
         // Cell reference, e.g. "A1", "B3"
@@ -184,13 +192,22 @@ class XlsxParser extends DocumentParserInterface {
         while (cells.length < colIdx) cells.add(null);
 
         cells.add(_cellValue(c, sharedStrings));
-        lastCol = colIdx;
       }
 
       rows.add(cells);
+
+      // Row's own `r` attribute is the authoritative 1-based row number.
+      // Rows can be sparse (an entirely blank row is often omitted from the
+      // XML entirely), so this must NOT be assumed to equal the row's
+      // position in our list — using position instead would cause edits to
+      // silently land on the wrong physical row when writing back.
+      positionalFallback++;
+      final rAttr = row.getAttribute('r');
+      final rNum  = rAttr != null ? int.tryParse(rAttr) : null;
+      rowNumbers.add(rNum ?? positionalFallback);
     }
 
-    return rows;
+    return _ParsedSheet(rows, rowNumbers);
   }
 
   /// Convert column letter(s) from cell ref (e.g. "AB3") to 0-based index.
@@ -243,4 +260,12 @@ class XlsxParser extends DocumentParserInterface {
   }
 }
 
+/// Result of parsing one worksheet's XML: cell values plus the real XLSX
+/// row number for each row (see [SpreadsheetBlock.rowNumbers] for why this
+/// matters for safe write-back).
+class _ParsedSheet {
+  final List<List<String?>> rows;
+  final List<int> rowNumbers;
+  const _ParsedSheet(this.rows, this.rowNumbers);
+}
 

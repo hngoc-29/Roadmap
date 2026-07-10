@@ -16,12 +16,14 @@ class HeadingRenderer extends StatelessWidget {
   final HeadingBlock block;
   final List<SearchHighlight> highlights;
   final double baseFontSize;
+  final double lineSpacing;
 
   const HeadingRenderer({
     super.key,
     required this.block,
     this.highlights   = const [],
     this.baseFontSize = 16.0,
+    this.lineSpacing  = 1.3,
   });
 
   @override
@@ -39,7 +41,7 @@ class HeadingRenderer extends StatelessWidget {
       fontSize:      config.fontSize * scale,
       fontWeight:    config.fontWeight,
       color:         color,
-      height:        1.3,
+      height:        lineSpacing,
       letterSpacing: config.letterSpacing,
     );
 
@@ -48,6 +50,7 @@ class HeadingRenderer extends StatelessWidget {
       context,
       highlights,
       defaultStyle: baseStyle,
+      lineHeightMultiplier: lineSpacing,
     );
 
     Widget heading = RichText(

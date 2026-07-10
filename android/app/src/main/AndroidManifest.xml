@@ -41,6 +41,11 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
+            <!-- Static app shortcuts (long-press launcher icon) -->
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
+
             <!-- ══════════════════════════════════════════════════════════════
                  "Open with FormulaDoc" — DOCX MIME type (content:// URIs)
                  Works with: Google Drive, Gmail attachments, Downloads app,

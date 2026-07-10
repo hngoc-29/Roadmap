@@ -3,12 +3,55 @@ import 'package:flutter/services.dart';
 
 import '../../core/constants/theme_constants.dart';
 
+/// Reading-surface modes for the document viewer. Distinct from the app's
+/// overall light/dark theme (AppBar, Home screen, Settings) — this only
+/// affects the paper background + text color used while reading a document,
+/// independent of the system theme.
+enum ReadingThemeMode { light, sepia, dark, highContrast }
+
 /// Provides [ThemeData] for light and dark modes.
 ///
 /// Academic / scientific aesthetic: deep blue primary, warm paper surfaces,
 /// clean typography optimised for reading long-form mathematical content.
 class AppTheme {
   AppTheme._();
+
+  /// Returns a [ThemeData] tailored for the document reading surface in a
+  /// given [ReadingThemeMode]. Built as a targeted `copyWith` on the existing
+  /// [light]/[dark] themes (swapping only surface/onSurface colors) rather
+  /// than duplicating the full theme definition, so AppBar/card/typography
+  /// styling stays consistent across all four modes.
+  static ThemeData forReadingMode(ReadingThemeMode mode) {
+    switch (mode) {
+      case ReadingThemeMode.light:
+        return light;
+      case ReadingThemeMode.dark:
+        return dark;
+      case ReadingThemeMode.sepia:
+        return light.copyWith(
+          colorScheme: light.colorScheme.copyWith(
+            surface:   ThemeConstants.paperSepia,
+            onSurface: ThemeConstants.textSepia,
+          ),
+        );
+      case ReadingThemeMode.highContrast:
+        return light.copyWith(
+          colorScheme: light.colorScheme.copyWith(
+            surface:   ThemeConstants.paperHighContrast,
+            onSurface: ThemeConstants.textHighContrast,
+          ),
+        );
+    }
+  }
+
+  /// Paper background color for a given reading mode (used for the
+  /// Container behind the document, matching [forReadingMode]'s surface).
+  static Color paperColorFor(ReadingThemeMode mode) => switch (mode) {
+        ReadingThemeMode.light        => ThemeConstants.paperLight,
+        ReadingThemeMode.sepia        => ThemeConstants.paperSepia,
+        ReadingThemeMode.dark         => ThemeConstants.paperDark,
+        ReadingThemeMode.highContrast => ThemeConstants.paperHighContrast,
+      };
 
   // ── Light theme ───────────────────────────────────────────────────────────
 

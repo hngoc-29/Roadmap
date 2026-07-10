@@ -4,20 +4,28 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:collection/collection.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:flutter_tts/flutter_tts.dart';
+import 'package:printing/printing.dart';
 
 import '../../../core/constants/app_constants.dart';
-import '../../../core/constants/theme_constants.dart';
+import '../../../data/models/document_block.dart'
+    hide TableRow, TableCell;
+import '../../../data/models/document_model.dart';
 import '../../../domain/abstractions/document_source.dart';
 import '../../providers/document_provider.dart';
 import '../../providers/font_size_provider.dart';
+import '../../providers/reading_prefs_provider.dart';
 import '../../providers/history_provider.dart';
 import '../../providers/search_provider.dart';
 import '../../providers/service_providers.dart';
+import '../../../services/reading_stats_service.dart';
 import '../../renderers/document_renderer_widget.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/document_search_bar.dart';
 import '../../widgets/scroll_position_indicator.dart';
 import 'widgets/toc_drawer.dart';
+import '../editor/editor_screen.dart';
+import '../editor/xlsx_editor_screen.dart';
 import 'widgets/viewer_error_widget.dart';
 import 'widgets/viewer_loading_widget.dart';
 
@@ -43,12 +51,19 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
   late final ScrollController _scrollController;
   final _transformController = TransformationController();
   final _scaffoldKey         = GlobalKey<ScaffoldState>();
+  final _sessionStopwatch    = Stopwatch();
 
   double  _currentZoom    = AppConstants.defaultZoom;
   bool    _showWarnings   = false;
   String? _currentFileId;
   Timer?  _scrollSaveTimer;
   bool    _resumeToastShown = false;
+  int     _currentPdfPage = 1;       // for PDF session restore
+
+  // ── Text-to-speech ────────────────────────────────────────────────────────
+  final FlutterTts _tts = FlutterTts();
+  bool  _isSpeaking = false;
+  int   _ttsBlockIndex = 0;
 
   // ── Zoom / gesture tracking ────────────────────────────────────────────────
   // Tracks how many fingers are currently on screen so we can switch between
@@ -57,18 +72,22 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
   int  _activePointers = 0;
   bool _multiTouch     = false;
 
-  /// Whether InteractiveViewer should handle panning.
-  ///
-  /// True when:
-  ///   • Two or more fingers are down (pinch-zoom needs pan enabled), OR
-  ///   • Already zoomed in (single-finger pans the zoomed content).
-  bool get _panActive => _multiTouch || _currentZoom > 1.005;
+  // Note: previously there was a `_panActive` getter (true when zoomed OR
+  // multi-touch) used to drive InteractiveViewer.panEnabled. That caused a
+  // gesture-arena conflict with SelectionArea (see panEnabled comment below),
+  // so panEnabled now depends on `_multiTouch` alone.
 
   @override
   void initState() {
     super.initState();
     _scrollController = ScrollController();
     _scrollController.addListener(_onScroll);
+    _sessionStopwatch.start();
+
+    _tts.setLanguage('vi-VN');
+    _tts.setCompletionHandler(_onTtsSegmentDone);
+    _tts.setCancelHandler(() => setState(() => _isSpeaking = false));
+    _tts.setErrorHandler((_) => setState(() => _isSpeaking = false));
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await _openDocumentIfNeeded();
@@ -79,9 +98,15 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
   @override
   void dispose() {
     _scrollSaveTimer?.cancel();
+    _pdfPageSaveTimer?.cancel();
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
     _transformController.dispose();
+    _tts.stop();
+    _sessionStopwatch.stop();
+    // Fire-and-forget: dispose() can't be async, and this is a best-effort
+    // local stat, not something the user is blocked on.
+    unawaited(ReadingStatsService().recordSession(_sessionStopwatch.elapsed));
     super.dispose();
   }
 
@@ -98,6 +123,12 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
     // Bind model to search notifier
     final model = ref.read(documentNotifierProvider).model;
     ref.read(searchNotifierProvider.notifier).bindDocument(model);
+
+    if (model != null) {
+      // Best-effort, local-only reading stats — not awaited on the critical
+      // open path since it's non-essential to the viewer working correctly.
+      unawaited(ReadingStatsService().recordDocumentOpened());
+    }
   }
 
   // ── Phase 4: scroll position save (debounced 800 ms) ─────────────────────
@@ -105,6 +136,30 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
   void _onScroll() {
     _scrollSaveTimer?.cancel();
     _scrollSaveTimer = Timer(const Duration(milliseconds: 800), _saveScrollPos);
+  }
+
+  // ── PDF page tracking (session resume) ───────────────────────────────────
+  //
+  // PDF documents render as a single PdfDocumentBlock inside the outer
+  // ListView, so the ListView's own maxScrollExtent stays ~0 and the normal
+  // scroll-fraction save/restore (used for DOCX/XLSX) never fires. We track
+  // the PDF's own internal page number instead and persist that separately.
+
+  Timer? _pdfPageSaveTimer;
+
+  void _onPdfPageChanged(int page) {
+    _currentPdfPage = page;
+    _pdfPageSaveTimer?.cancel();
+    _pdfPageSaveTimer = Timer(const Duration(milliseconds: 600), () {
+      final filePath = widget.filePath ?? widget.source?.path
+          ?? ref.read(documentNotifierProvider).currentFilePath;
+      if (filePath == null) return;
+      final record = ref.read(historyNotifierProvider).recentFiles
+          .where((r) => r.path == filePath).firstOrNull;
+      if (record != null) {
+        ref.read(historyServiceProvider).savePdfPage(record.id, page);
+      }
+    });
   }
 
   void _saveScrollPos() {
@@ -144,8 +199,16 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
         .recentFiles
         .where((r) => r.path == filePath)
         .firstOrNull;
+    if (record == null) return;
 
-    if (record == null || record.lastScrollPosition < 0.02) return;
+    // PDF: restore last page (PdfController reads this via pdfInitialPage).
+    if (record.lastPdfPage > 1) {
+      setState(() => _currentPdfPage = record.lastPdfPage);
+      _showResumeToastText('Tiếp tục từ trang ${record.lastPdfPage}');
+      return;
+    }
+
+    if (record.lastScrollPosition < 0.02) return;
 
     // ListView with images may not have its full extent on the first frame.
     // We retry up to 10 times (every 100 ms) until maxScrollExtent > 0.
@@ -320,14 +383,295 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
     );
   }
 
+  // ── Print (PDF only) ─────────────────────────────────────────────────────
+  //
+  // Scoped to PDF documents only: we already hold the exact original PDF
+  // bytes (PdfDocumentBlock.bytes), so printing is a direct pass-through to
+  // the system print dialog. DOCX/XLSX printing would require accurately
+  // re-laying-out our custom Flutter rendering into paginated PDF output —
+  // a substantially bigger, separate task — so it isn't offered here to
+  // avoid promising print output that doesn't match what's on screen.
+
+  Future<void> _printDocument() async {
+    final model = ref.read(documentNotifierProvider).model;
+    final pdfBlock = model?.blocks.whereType<PdfDocumentBlock>().firstOrNull;
+    if (pdfBlock == null) return;
+    await Printing.layoutPdf(onLayout: (_) async => pdfBlock.bytes);
+  }
+
+  // ── Editor ────────────────────────────────────────────────────────────────
+
+  void _openEditor() {
+    final ds    = ref.read(documentNotifierProvider);
+    final model = ds.model;
+    final path  = ds.currentFilePath;
+    final name  = ds.currentFileName ?? 'document.docx';
+    if (model == null || path == null) return;
+
+    final isXlsx = name.toLowerCase().endsWith('.xlsx');
+
+    Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => isXlsx
+          ? XlsxEditorScreen(model: model, filePath: path, fileName: name)
+          : EditorScreen(model: model, filePath: path, fileName: name),
+    )).then((_) {
+      // Reload the document after returning from the editor in case it was
+      // saved, so the viewer reflects the latest content.
+      ref.read(documentNotifierProvider.notifier).open(FileDocumentSource(path));
+    });
+  }
+
+  // ── Text-to-speech ────────────────────────────────────────────────────────
+
+  Future<void> _toggleTts() async {
+    if (_isSpeaking) {
+      await _tts.stop();
+      setState(() => _isSpeaking = false);
+      return;
+    }
+    final model = ref.read(documentNotifierProvider).model;
+    if (model == null) return;
+
+    // Find the first readable block at or after the current scroll position,
+    // so "read aloud" resumes from roughly where the user is looking rather
+    // than always restarting from the top of the document.
+    _ttsBlockIndex = _estimateVisibleBlockIndex(model);
+    setState(() => _isSpeaking = true);
+    await _speakBlockAt(model, _ttsBlockIndex);
+  }
+
+  int _estimateVisibleBlockIndex(DocumentModel model) {
+    if (!_scrollController.hasClients || model.blocks.isEmpty) return 0;
+    final max = _scrollController.position.maxScrollExtent;
+    if (max <= 0) return 0;
+    final fraction = (_scrollController.offset / max).clamp(0.0, 1.0);
+    return (fraction * (model.blocks.length - 1)).round();
+  }
+
+  Future<void> _speakBlockAt(DocumentModel model, int index) async {
+    if (index >= model.blocks.length) {
+      setState(() => _isSpeaking = false);
+      return;
+    }
+    final block = model.blocks[index];
+    final text = switch (block) {
+      ParagraphBlock() => block.plainText,
+      HeadingBlock()   => block.plainText,
+      _                => '',
+    };
+    _ttsBlockIndex = index;
+    if (text.trim().isEmpty) {
+      // Skip empty/non-text blocks (images, tables, equations) immediately.
+      await _speakBlockAt(model, index + 1);
+      return;
+    }
+    await _tts.speak(text);
+  }
+
+  void _onTtsSegmentDone() {
+    if (!_isSpeaking || !mounted) return;
+    final model = ref.read(documentNotifierProvider).model;
+    if (model == null) {
+      setState(() => _isSpeaking = false);
+      return;
+    }
+    _speakBlockAt(model, _ttsBlockIndex + 1);
+  }
+
+  // ── Bookmarks ─────────────────────────────────────────────────────────────
+
+  Future<void> _toggleCurrentBookmark() async {
+    final model = ref.read(documentNotifierProvider).model;
+    final filePath = widget.filePath ?? widget.source?.path
+        ?? ref.read(documentNotifierProvider).currentFilePath;
+    if (model == null || filePath == null) return;
+
+    final record = ref.read(historyNotifierProvider).recentFiles
+        .where((r) => r.path == filePath).firstOrNull;
+    if (record == null) return;
+
+    final blockIndex = _estimateVisibleBlockIndex(model);
+    final marks = await ref.read(historyServiceProvider)
+        .toggleBookmark(record.id, blockIndex);
+    await ref.read(historyNotifierProvider.notifier).load();
+
+    if (!mounted) return;
+    final added = marks.contains(blockIndex);
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content:  Text(added ? 'Đã đánh dấu trang này' : 'Đã bỏ đánh dấu'),
+      behavior: SnackBarBehavior.floating,
+      duration: const Duration(seconds: 2),
+    ));
+  }
+
+  // ── Reading theme picker ──────────────────────────────────────────────────
+
+  void _showReadingThemePicker() {
+    showModalBottomSheet<void>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (sheetContext) => Consumer(builder: (sheetContext, sheetRef, _) {
+        final current = sheetRef.watch(readingThemeProvider);
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 36, height: 4,
+                  margin: const EdgeInsets.only(bottom: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade400,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const Align(
+                  alignment: Alignment.centerLeft,
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16),
+                    child: Text('Giao diện đọc',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                for (final mode in ReadingThemeMode.values)
+                  RadioListTile<ReadingThemeMode>(
+                    value: mode,
+                    groupValue: current,
+                    title: Row(children: [
+                      Container(
+                        width: 20, height: 20,
+                        margin: const EdgeInsets.only(right: 10),
+                        decoration: BoxDecoration(
+                          color: AppTheme.paperColorFor(mode),
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.grey.shade400),
+                        ),
+                      ),
+                      Text(_readingThemeName(mode)),
+                    ]),
+                    onChanged: (v) {
+                      sheetRef.read(readingThemeProvider.notifier).setMode(v!);
+                      Navigator.pop(sheetContext);
+                    },
+                  ),
+                const SizedBox(height: 8),
+              ],
+            ),
+          ),
+        );
+      }),
+    );
+  }
+
+  String _readingThemeName(ReadingThemeMode mode) => switch (mode) {
+        ReadingThemeMode.light        => 'Sáng',
+        ReadingThemeMode.sepia        => 'Sepia (giấy vàng)',
+        ReadingThemeMode.dark         => 'Tối',
+        ReadingThemeMode.highContrast => 'Tương phản cao',
+      };
+
+  // ── Collections ───────────────────────────────────────────────────────────
+
+  Future<void> _showCollectionsPicker() async {
+    final filePath = widget.filePath ?? widget.source?.path
+        ?? ref.read(documentNotifierProvider).currentFilePath;
+    if (filePath == null) return;
+    final record = ref.read(historyNotifierProvider).recentFiles
+        .where((r) => r.path == filePath).firstOrNull;
+    if (record == null) return;
+
+    final histSvc  = ref.read(historyServiceProvider);
+    final existing = await histSvc.getAllCollections();
+    final current  = Set<String>.from(record.collections);
+    final controller = TextEditingController();
+
+    if (!mounted) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (sheetContext, setSheetState) => Padding(
+          padding: EdgeInsets.only(
+            left: 20, right: 20, top: 16,
+            bottom: MediaQuery.of(sheetContext).viewInsets.bottom + 24,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Bộ sưu tập',
+                  style: Theme.of(sheetContext).textTheme.titleMedium
+                      ?.copyWith(fontWeight: FontWeight.w700)),
+              const SizedBox(height: 12),
+              if (existing.isEmpty)
+                const Text('Chưa có bộ sưu tập nào.',
+                    style: TextStyle(color: Colors.black45)),
+              Wrap(
+                spacing: 8, runSpacing: 8,
+                children: existing.map((name) {
+                  final selected = current.contains(name);
+                  return FilterChip(
+                    label:    Text(name),
+                    selected: selected,
+                    onSelected: (v) async {
+                      if (v) {
+                        await histSvc.addToCollection(record.id, name);
+                        current.add(name);
+                      } else {
+                        await histSvc.removeFromCollection(record.id, name);
+                        current.remove(name);
+                      }
+                      setSheetState(() {});
+                      await ref.read(historyNotifierProvider.notifier).load();
+                    },
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 16),
+              Row(children: [
+                Expanded(
+                  child: TextField(
+                    controller: controller,
+                    decoration: const InputDecoration(
+                      hintText: 'Tên bộ sưu tập mới…',
+                      isDense: true,
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                FilledButton(
+                  onPressed: () async {
+                    final name = controller.text.trim();
+                    if (name.isEmpty) return;
+                    await histSvc.addToCollection(record.id, name);
+                    await ref.read(historyNotifierProvider.notifier).load();
+                    controller.clear();
+                    setSheetState(() {});
+                  },
+                  child: const Text('Thêm'),
+                ),
+              ]),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   // ── Resume toast ──────────────────────────────────────────────────────────
 
   void _showResumeToast(double fraction) {
-    if (_resumeToastShown) return;
-    _resumeToastShown = true;
     final pct = (fraction * 100).round();
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text('Tiếp tục từ $pct%'),
+    _showResumeToastText(
+      'Tiếp tục từ $pct%',
       action: SnackBarAction(
         label:     'Đầu trang',
         onPressed: () => _scrollController.animateTo(
@@ -336,6 +680,16 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
           curve:    Curves.easeOut,
         ),
       ),
+    );
+  }
+
+  void _showResumeToastText(String text, {SnackBarAction? action}) {
+    if (_resumeToastShown) return;
+    _resumeToastShown = true;
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(text),
+      action:  action,
       behavior: SnackBarBehavior.floating,
       duration: const Duration(seconds: 4),
     ));
@@ -401,11 +755,15 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
       }
     });
 
-    final fontSize  = ref.watch(fontSizeProvider);
+    final fontSize      = ref.watch(fontSizeProvider);
+    final lineSpacing   = ref.watch(lineSpacingProvider);
+    final readingMargin = ref.watch(readingMarginProvider);
+    final readingTheme  = ref.watch(readingThemeProvider);
+    final paperColor    = AppTheme.paperColorFor(readingTheme);
 
     return Scaffold(
       key:             _scaffoldKey,
-      backgroundColor: ThemeConstants.paperLight,
+      backgroundColor: paperColor,
       drawer: state.isLoaded && state.model != null
           ? TocDrawer(
               model:  state.model!,
@@ -416,10 +774,13 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
         children: [
           // ── AppBar ────────────────────────────────────────────────────────
           _ViewerAppBar(
-            state:       state,
-            currentZoom: _currentZoom,
+            state:        state,
+            currentZoom:  _currentZoom,
+            readingTheme: readingTheme,
+            isSpeaking:   _isSpeaking,
             onBack:      () {
               _saveScrollPos();
+              _tts.stop();
               ref.read(documentNotifierProvider.notifier).reset();
               ref.read(searchNotifierProvider.notifier).close();
               Navigator.of(context).pop();
@@ -430,11 +791,17 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
             onSearch:    () {
               ref.read(searchNotifierProvider.notifier).open();
             },
-            onWarnings:  () => setState(() => _showWarnings = !_showWarnings),
-            onToc:       _openToc,
-            onShare:     _shareFile,
-            onFavorite:  _toggleFavorite,
-            onStats:     _showStats,
+            onWarnings:     () => setState(() => _showWarnings = !_showWarnings),
+            onToc:          _openToc,
+            onShare:        _shareFile,
+            onFavorite:     _toggleFavorite,
+            onStats:        _showStats,
+            onReadingTheme: _showReadingThemePicker,
+            onBookmark:     _toggleCurrentBookmark,
+            onTts:          _toggleTts,
+            onCollections:  _showCollectionsPicker,
+            onEdit:         _openEditor,
+            onPrint:        _printDocument,
           ),
 
           // ── Phase 4: animated search bar ──────────────────────────────────
@@ -445,7 +812,8 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
             child: Stack(
               children: [
                 if (state.isLoaded && state.model != null)
-                  _buildDocumentView(context, state, fontSize),
+                  _buildDocumentView(
+                    context, state, fontSize, lineSpacing, readingMargin, readingTheme, paperColor),
                 if (state.isInitial)
                   const Center(child: CircularProgressIndicator()),
                 if (state.isLoading)
@@ -480,7 +848,15 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
     );
   }
 
-  Widget _buildDocumentView(BuildContext context, DocumentState state, double fontSize) {
+  Widget _buildDocumentView(
+    BuildContext context,
+    DocumentState state,
+    double fontSize,
+    double lineSpacing,
+    double horizontalMargin,
+    ReadingThemeMode readingTheme,
+    Color paperColor,
+  ) {
     // ── Listener tracks active pointer count ────────────────────────────────
     // We use raw pointer events (not GestureDetector) so we can reliably
     // count fingers without fighting the gesture arena.
@@ -516,17 +892,35 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
           // When scale < 1 the shrunken content leaves gaps. A plain white
           // Container behind the InteractiveViewer fills them so the user
           // never sees the dark Scaffold background.
-          Container(color: ThemeConstants.paperLight),
+          Container(color: paperColor),
 
-          InteractiveViewer(
+          // Double-tap-to-reset-zoom. GestureDetector only instantiates a
+          // DoubleTapGestureRecognizer when onDoubleTap is non-null, so at
+          // normal 1× zoom (callback = null) this adds zero competition
+          // against SelectionArea's own double-tap-to-select-word — the
+          // recognizer simply doesn't exist until the user has zoomed in.
+          GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onDoubleTap: _currentZoom > 1.005 ? () => _applyZoom(1.0) : null,
+            child: InteractiveViewer(
             transformationController: _transformController,
             minScale: AppConstants.minZoom,
             maxScale: AppConstants.maxZoom,
             constrained: false, // lets content exceed viewport when zoomed in
 
-            // Dynamic pan: off during single-finger-at-1× so the ListView
-            // inside can scroll normally; on during pinch or when zoomed in.
-            panEnabled: _panActive,
+            // Pan only during an actual 2-finger gesture (pinch).
+            // Previously this was `_panActive` (true whenever zoom > 1 even
+            // with ONE finger down), which made InteractiveViewer's
+            // PanGestureRecognizer compete with SelectionArea's long-press+
+            // drag recognizer in the same gesture arena — Flutter usually
+            // resolved that in favour of panning, so long-press-to-select
+            // felt unreliable or didn't trigger at all whenever the user had
+            // zoomed in even slightly.
+            // With panEnabled only true for genuine multi-touch, a single
+            // finger is never claimed by InteractiveViewer, so long-press
+            // selection and the ListView's own vertical scroll behave
+            // exactly like a normal (non-zoomable) text screen.
+            panEnabled: _multiTouch,
 
             onInteractionUpdate: (_) {
               final s = _transformController.value.getMaxScaleOnAxis();
@@ -550,25 +944,38 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
               width:  viewW,
               height: viewH,
               child: AbsorbPointer(
-                // Only block child touch events during a 2-finger gesture.
-                // Using _panActive (which includes zoom>1) would also block
-                // SelectionArea's long-press, preventing text copy entirely
-                // whenever the document is zoomed in.
+                // Only block child touch events during a 2-finger gesture
+                // (pinch). Absorbing based on zoom level too would also
+                // block SelectionArea's long-press, preventing text copy
+                // entirely whenever the document is zoomed in.
                 absorbing: _multiTouch,
                 child: Center(
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(
                         maxWidth: AppConstants.documentMaxWidth),
                     child: Theme(
-                      data: AppTheme.light,
+                      // Reading theme (Sáng/Sepia/Tối/Tương phản cao) is a
+                      // per-viewer preference independent of the app's system
+                      // theme — document content is normally forced to
+                      // light/paper-white regardless of dark mode, but the
+                      // user can explicitly opt into one of 4 reading
+                      // surfaces here. text_run_builder already adapts
+                      // hardcoded document colors for legibility based on
+                      // Theme.of(context).brightness, so switching this is
+                      // sufficient for all 4 modes.
+                      data: AppTheme.forReadingMode(readingTheme),
                       child: Container(
-                        color: ThemeConstants.paperLight,
+                        color: paperColor,
                         child: SelectionArea(
                           child: DocumentRendererWidget(
                             model:            state.model!,
                             scrollController: _scrollController,
                             onLinkTap:        _handleLinkTap,
                             baseFontSize:     fontSize,
+                            lineSpacing:      lineSpacing,
+                            horizontalMargin: horizontalMargin,
+                            pdfInitialPage:   _currentPdfPage,
+                            onPdfPageChanged: _onPdfPageChanged,
                           ),
                         ),
                       ),
@@ -577,6 +984,7 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
                 ),
               ),
             ),
+          ),
           ),
         ]);
       }),
@@ -591,6 +999,8 @@ class _ViewerScreenState extends ConsumerState<ViewerScreen> {
 class _ViewerAppBar extends ConsumerWidget implements PreferredSizeWidget {
   final DocumentState state;
   final double        currentZoom;
+  final ReadingThemeMode readingTheme;
+  final bool          isSpeaking;
   final VoidCallback  onBack;
   final VoidCallback  onZoomIn;
   final VoidCallback  onZoomOut;
@@ -601,10 +1011,18 @@ class _ViewerAppBar extends ConsumerWidget implements PreferredSizeWidget {
   final VoidCallback  onShare;
   final VoidCallback  onFavorite;
   final VoidCallback  onStats;
+  final VoidCallback  onReadingTheme;
+  final VoidCallback  onBookmark;
+  final VoidCallback  onTts;
+  final VoidCallback  onCollections;
+  final VoidCallback  onEdit;
+  final VoidCallback  onPrint;
 
   const _ViewerAppBar({
     required this.state,
     required this.currentZoom,
+    required this.readingTheme,
+    required this.isSpeaking,
     required this.onBack,
     required this.onZoomIn,
     required this.onZoomOut,
@@ -615,6 +1033,12 @@ class _ViewerAppBar extends ConsumerWidget implements PreferredSizeWidget {
     required this.onShare,
     required this.onFavorite,
     required this.onStats,
+    required this.onReadingTheme,
+    required this.onBookmark,
+    required this.onTts,
+    required this.onCollections,
+    required this.onEdit,
+    required this.onPrint,
   });
 
   @override
@@ -694,10 +1118,16 @@ class _ViewerAppBar extends ConsumerWidget implements PreferredSizeWidget {
             icon: const Icon(Icons.more_vert),
             onSelected: (action) {
               switch (action) {
-                case _AppBarAction.toc:      onToc();
-                case _AppBarAction.share:    onShare();
-                case _AppBarAction.favorite: onFavorite();
-                case _AppBarAction.stats:    onStats();
+                case _AppBarAction.toc:         onToc();
+                case _AppBarAction.share:       onShare();
+                case _AppBarAction.favorite:    onFavorite();
+                case _AppBarAction.stats:       onStats();
+                case _AppBarAction.readingTheme: onReadingTheme();
+                case _AppBarAction.bookmark:    onBookmark();
+                case _AppBarAction.tts:         onTts();
+                case _AppBarAction.collections: onCollections();
+                case _AppBarAction.edit:        onEdit();
+                case _AppBarAction.print:       onPrint();
               }
             },
             itemBuilder: (_) => [
@@ -708,11 +1138,41 @@ class _ViewerAppBar extends ConsumerWidget implements PreferredSizeWidget {
                   SizedBox(width: 12), Text('Mục lục'),
                 ]),
               ),
+              PopupMenuItem(
+                value: _AppBarAction.bookmark,
+                child: const Row(children: [
+                  Icon(Icons.bookmark_add_outlined, size: 18),
+                  SizedBox(width: 12), Text('Đánh dấu trang này'),
+                ]),
+              ),
               const PopupMenuItem(
                 value: _AppBarAction.favorite,
                 child: Row(children: [
                   Icon(Icons.star_outline, size: 18),
                   SizedBox(width: 12), Text('Thêm yêu thích'),
+                ]),
+              ),
+              const PopupMenuItem(
+                value: _AppBarAction.collections,
+                child: Row(children: [
+                  Icon(Icons.folder_special_outlined, size: 18),
+                  SizedBox(width: 12), Text('Thêm vào bộ sưu tập'),
+                ]),
+              ),
+              PopupMenuItem(
+                value: _AppBarAction.readingTheme,
+                child: Row(children: [
+                  Icon(_readingThemeIcon(readingTheme), size: 18),
+                  const SizedBox(width: 12),
+                  const Text('Giao diện đọc'),
+                ]),
+              ),
+              PopupMenuItem(
+                value: _AppBarAction.tts,
+                child: Row(children: [
+                  Icon(isSpeaking ? Icons.stop_circle_outlined : Icons.volume_up_outlined, size: 18),
+                  const SizedBox(width: 12),
+                  Text(isSpeaking ? 'Dừng đọc' : 'Đọc to văn bản'),
                 ]),
               ),
               const PopupMenuItem(
@@ -729,6 +1189,23 @@ class _ViewerAppBar extends ConsumerWidget implements PreferredSizeWidget {
                   SizedBox(width: 12), Text('Thông tin tài liệu'),
                 ]),
               ),
+              if ((state.currentFileName ?? '').toLowerCase().endsWith('.docx') ||
+                  (state.currentFileName ?? '').toLowerCase().endsWith('.xlsx'))
+                const PopupMenuItem(
+                  value: _AppBarAction.edit,
+                  child: Row(children: [
+                    Icon(Icons.edit_outlined, size: 18),
+                    SizedBox(width: 12), Text('Chỉnh sửa'),
+                  ]),
+                ),
+              if ((state.currentFileName ?? '').toLowerCase().endsWith('.pdf'))
+                const PopupMenuItem(
+                  value: _AppBarAction.print,
+                  child: Row(children: [
+                    Icon(Icons.print_outlined, size: 18),
+                    SizedBox(width: 12), Text('In tài liệu'),
+                  ]),
+                ),
             ],
           ),
 
@@ -813,7 +1290,14 @@ class _WarningsPanel extends StatelessWidget {
 
 // ── Supporting types ──────────────────────────────────────────────────────────
 
-enum _AppBarAction { toc, share, favorite, stats }
+enum _AppBarAction { toc, share, favorite, stats, readingTheme, bookmark, tts, collections, edit, print }
+
+IconData _readingThemeIcon(ReadingThemeMode mode) => switch (mode) {
+      ReadingThemeMode.light        => Icons.wb_sunny_outlined,
+      ReadingThemeMode.sepia        => Icons.menu_book_outlined,
+      ReadingThemeMode.dark         => Icons.dark_mode_outlined,
+      ReadingThemeMode.highContrast => Icons.contrast_outlined,
+    };
 
 class _StatRow {
   final String label;

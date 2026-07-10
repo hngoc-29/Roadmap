@@ -6,7 +6,9 @@ import '../../../core/constants/theme_constants.dart';
 import '../../providers/history_provider.dart';
 import '../../providers/service_providers.dart';
 import '../../providers/font_size_provider.dart';
+import '../../providers/reading_prefs_provider.dart';
 import '../../providers/theme_provider.dart';
+import '../../../services/reading_stats_service.dart';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // SETTINGS SCREEN
@@ -99,6 +101,77 @@ class SettingsScreen extends ConsumerWidget {
                   ],
                 );
               }),
+
+              // ── Line spacing slider ────────────────────────────────────────
+              Consumer(builder: (context, ref, _) {
+                final spacing = ref.watch(lineSpacingProvider);
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Giãn dòng'),
+                          Text(
+                            spacing.toStringAsFixed(1),
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w600,
+                              color:      ThemeConstants.primaryBlue,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Slider(
+                      value: spacing,
+                      min: kMinLineSpacing,
+                      max: kMaxLineSpacing,
+                      divisions: 10,
+                      label: spacing.toStringAsFixed(1),
+                      onChanged: (v) =>
+                          ref.read(lineSpacingProvider.notifier).setValue(v),
+                    ),
+                  ],
+                );
+              }),
+
+              // ── Margin slider ───────────────────────────────────────────────
+              Consumer(builder: (context, ref, _) {
+                final margin = ref.watch(readingMarginProvider);
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Lề trái/phải'),
+                          Text(
+                            '${margin.round()}px',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w600,
+                              color:      ThemeConstants.primaryBlue,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Slider(
+                      value: margin,
+                      min: kMinMargin,
+                      max: kMaxMargin,
+                      divisions: 8,
+                      label: '${margin.round()}px',
+                      onChanged: (v) =>
+                          ref.read(readingMarginProvider.notifier).setValue(v),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                );
+              }),
             ],
           ),
 
@@ -151,6 +224,48 @@ class SettingsScreen extends ConsumerWidget {
                   ),
                 ]);
               }),
+            ],
+          ),
+
+          // ── Thống kê đọc ──────────────────────────────────────────────────
+          _SectionCard(
+            title: 'Thống kê đọc',
+            icon:  Icons.insights_outlined,
+            children: [
+              FutureBuilder<ReadingStats>(
+                future: ReadingStatsService().getStats(),
+                builder: (context, snapshot) {
+                  final stats = snapshot.data;
+                  if (stats == null) {
+                    return const Padding(
+                      padding: EdgeInsets.all(16),
+                      child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                    );
+                  }
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+                    child: Row(
+                      children: [
+                        Expanded(child: _StatTile(
+                          icon:  Icons.schedule,
+                          value: _formatDuration(stats.totalReadTime),
+                          label: 'Thời gian đọc',
+                        )),
+                        Expanded(child: _StatTile(
+                          icon:  Icons.menu_book,
+                          value: '${stats.documentsOpened}',
+                          label: 'Tài liệu đã mở',
+                        )),
+                        Expanded(child: _StatTile(
+                          icon:  Icons.local_fire_department,
+                          value: '${stats.currentStreak}',
+                          label: 'Ngày liên tiếp',
+                        )),
+                      ],
+                    ),
+                  );
+                },
+              ),
             ],
           ),
 
@@ -292,6 +407,12 @@ class SettingsScreen extends ConsumerWidget {
   static String _formatSize(int kb) {
     if (kb < 1024) return '$kb KB';
     return '${(kb / 1024).toStringAsFixed(1)} MB';
+  }
+
+  static String _formatDuration(Duration d) {
+    if (d.inHours >= 1) return '${d.inHours}h ${d.inMinutes % 60}p';
+    if (d.inMinutes >= 1) return '${d.inMinutes} phút';
+    return '${d.inSeconds}s';
   }
 }
 
@@ -456,5 +577,29 @@ class _FormatRow extends StatelessWidget {
               fontFamily: 'monospace',
             )),
         dense: true,
+      );
+}
+
+class _StatTile extends StatelessWidget {
+  final IconData icon;
+  final String   value;
+  final String   label;
+  const _StatTile({required this.icon, required this.value, required this.label});
+
+  @override
+  Widget build(BuildContext context) => Column(
+        children: [
+          Icon(icon, size: 20, color: ThemeConstants.primaryBlue),
+          const SizedBox(height: 6),
+          Text(value,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 2),
+          Text(label,
+              style: TextStyle(
+                fontSize: 10.5,
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.55),
+              ),
+              textAlign: TextAlign.center),
+        ],
       );
 }

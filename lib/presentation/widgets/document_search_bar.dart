@@ -31,6 +31,7 @@ class _DocumentSearchBarState extends ConsumerState<DocumentSearchBar>
     super.initState();
     _controller    = TextEditingController();
     _focusNode     = FocusNode();
+    _focusNode.addListener(() => setState(() {}));
     _animController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 220),
@@ -59,6 +60,7 @@ class _DocumentSearchBarState extends ConsumerState<DocumentSearchBar>
   }
 
   void _close() {
+    ref.read(searchNotifierProvider.notifier).submitQuery();
     _animController.reverse().then((_) {
       ref.read(searchNotifierProvider.notifier).close();
       _controller.clear();
@@ -102,14 +104,34 @@ class _DocumentSearchBarState extends ConsumerState<DocumentSearchBar>
           if (event.logicalKey == LogicalKeyboardKey.escape) _close();
           if (event.logicalKey == LogicalKeyboardKey.enter) _navigate(true);
         },
-        child: _SearchBarContent(
-          controller:   _controller,
-          focusNode:    _focusNode,
-          searchState:  searchState,
-          onChanged:    _onQueryChanged,
-          onClose:      _close,
-          onNext:       () => _navigate(true),
-          onPrev:       () => _navigate(false),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _SearchBarContent(
+              controller:   _controller,
+              focusNode:    _focusNode,
+              searchState:  searchState,
+              onChanged:    _onQueryChanged,
+              onClose:      _close,
+              onNext:       () => _navigate(true),
+              onPrev:       () => _navigate(false),
+            ),
+            // ── Recent search chips ──────────────────────────────────────
+            // Shown only while the field is empty and focused, so returning
+            // users don't have to retype common queries.
+            if (searchState.query.isEmpty &&
+                searchState.recentQueries.isNotEmpty &&
+                _focusNode.hasFocus)
+              _RecentQueriesRow(
+                queries: searchState.recentQueries,
+                onTap: (q) {
+                  _controller.text = q;
+                  _onQueryChanged(q);
+                },
+                onClear: () =>
+                    ref.read(searchNotifierProvider.notifier).clearHistory(),
+              ),
+          ],
         ),
       ),
     );
@@ -308,4 +330,72 @@ class _SearchToggle extends StatelessWidget {
       ),
     ),
   );
+}
+
+// ─── Recent search history chips ───────────────────────────────────────────────
+
+class _RecentQueriesRow extends StatelessWidget {
+  final List<String>            queries;
+  final void Function(String q) onTap;
+  final VoidCallback            onClear;
+
+  const _RecentQueriesRow({
+    required this.queries,
+    required this.onTap,
+    required this.onClear,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      width: double.infinity,
+      color: isDark ? const Color(0xFF1A2340) : Colors.white,
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Tìm gần đây',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                  )),
+              InkWell(
+                onTap: onClear,
+                child: Text('Xóa',
+                    style: TextStyle(fontSize: 11, color: ThemeConstants.primaryBlue)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 6, runSpacing: 6,
+            children: queries.map((q) => InkWell(
+              onTap: () => onTap(q),
+              borderRadius: BorderRadius.circular(14),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: ThemeConstants.primaryBlue.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.history, size: 13, color: ThemeConstants.primaryBlue),
+                    const SizedBox(width: 4),
+                    Text(q, style: const TextStyle(fontSize: 12.5)),
+                  ],
+                ),
+              ),
+            )).toList(),
+          ),
+        ],
+      ),
+    );
+  }
 }

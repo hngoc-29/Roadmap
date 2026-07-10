@@ -15,6 +15,12 @@ class ThemeConstants {
   // ── Surface / paper ───────────────────────────────────────────────────────
   static const Color paperLight = Color(0xFFFAFAFA);
   static const Color paperDark = Color(0xFF1E1E1E);
+
+  // ── Reading modes (viewer document surface only) ────────────────────────
+  static const Color paperSepia        = Color(0xFFF4ECD8);
+  static const Color textSepia         = Color(0xFF3E2F1C);
+  static const Color paperHighContrast = Color(0xFFFFFFFF);
+  static const Color textHighContrast  = Color(0xFF000000);
   static const Color surfaceDark = Color(0xFF252525);
 
   // ── Text ──────────────────────────────────────────────────────────────────

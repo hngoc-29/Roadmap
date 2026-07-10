@@ -12,12 +12,30 @@ class RecentFileCard extends StatelessWidget {
   final VoidCallback onFavoriteToggle;
   final VoidCallback onRemove;
 
+  /// True when this record matched the current search by document CONTENT
+  /// rather than by filename — shows a small "nội dung" badge so the user
+  /// understands why a result with a non-matching-looking name appeared.
+  final bool matchedByContent;
+
+  /// Multi-select ("Quản lý" / batch delete) support. When [selectionMode]
+  /// is true, tapping the card toggles [selected] via [onSelectToggle]
+  /// instead of opening the file, and a checkbox replaces the file icon.
+  final bool selectionMode;
+  final bool selected;
+  final VoidCallback? onSelectToggle;
+  final VoidCallback? onLongPress;
+
   const RecentFileCard({
     super.key,
     required this.record,
     required this.onTap,
     required this.onFavoriteToggle,
     required this.onRemove,
+    this.matchedByContent = false,
+    this.selectionMode    = false,
+    this.selected         = false,
+    this.onSelectToggle,
+    this.onLongPress,
   });
 
   @override
@@ -26,32 +44,50 @@ class RecentFileCard extends StatelessWidget {
     final ext    = record.name.split('.').last.toLowerCase();
 
     return Card(
+      color: selected
+          ? ThemeConstants.primaryBlue.withValues(alpha: 0.08)
+          : null,
       child: InkWell(
-        onTap: onTap,
+        onTap: selectionMode ? onSelectToggle : onTap,
+        onLongPress: onLongPress,
         borderRadius: ThemeConstants.cardRadius,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           child: Row(
             children: [
-              // ── File icon ─────────────────────────────────────────────────
-              Container(
-                width: 44, height: 44,
-                decoration: BoxDecoration(
-                  color:        _iconColor(ext).withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(ThemeConstants.radiusSm),
-                ),
-                child: Center(
-                  child: Text(
-                    _iconLabel(ext),
-                    style: TextStyle(
-                      fontSize:   ext == 'pdf' ? 12 : 18,
-                      fontWeight: FontWeight.w800,
-                      color:      _iconColor(ext),
-                      letterSpacing: ext == 'pdf' ? 0.5 : 0,
+              // ── File icon / selection checkbox ───────────────────────────
+              if (selectionMode)
+                SizedBox(
+                  width: 44, height: 44,
+                  child: Center(
+                    child: Icon(
+                      selected ? Icons.check_circle : Icons.circle_outlined,
+                      color: selected
+                          ? ThemeConstants.primaryBlue
+                          : Colors.grey.shade400,
+                      size: 26,
+                    ),
+                  ),
+                )
+              else
+                Container(
+                  width: 44, height: 44,
+                  decoration: BoxDecoration(
+                    color:        _iconColor(ext).withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(ThemeConstants.radiusSm),
+                  ),
+                  child: Center(
+                    child: Text(
+                      _iconLabel(ext),
+                      style: TextStyle(
+                        fontSize:   ext == 'pdf' ? 12 : 18,
+                        fontWeight: FontWeight.w800,
+                        color:      _iconColor(ext),
+                        letterSpacing: ext == 'pdf' ? 0.5 : 0,
+                      ),
                     ),
                   ),
                 ),
-              ),
               const SizedBox(width: 12),
 
               // ── Info ──────────────────────────────────────────────────────
@@ -59,12 +95,28 @@ class RecentFileCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      FileUtils.stemOf(record.name),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.titleSmall,
-                    ),
+                    Row(children: [
+                      Flexible(
+                        child: Text(
+                          FileUtils.stemOf(record.name),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.titleSmall,
+                        ),
+                      ),
+                      if (matchedByContent) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: ThemeConstants.primaryBlue.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Text('nội dung',
+                              style: TextStyle(fontSize: 9.5, color: ThemeConstants.primaryBlue)),
+                        ),
+                      ],
+                    ]),
                     const SizedBox(height: 3),
                     Row(
                       children: [
@@ -105,53 +157,55 @@ class RecentFileCard extends StatelessWidget {
                 ),
               ),
 
-              // ── Actions ───────────────────────────────────────────────────
-              IconButton(
-                icon: Icon(
-                  record.isFavorite ? Icons.star : Icons.star_outline,
-                  size: 20,
-                  color: record.isFavorite
-                      ? const Color(0xFFFFAB00)
-                      : Theme.of(context)
-                          .colorScheme
-                          .onSurface
-                          .withValues(alpha: 0.4),
+              // ── Actions (hidden during multi-select) ─────────────────────
+              if (!selectionMode) ...[
+                IconButton(
+                  icon: Icon(
+                    record.isFavorite ? Icons.star : Icons.star_outline,
+                    size: 20,
+                    color: record.isFavorite
+                        ? const Color(0xFFFFAB00)
+                        : Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withValues(alpha: 0.4),
+                  ),
+                  onPressed: onFavoriteToggle,
+                  tooltip: record.isFavorite
+                      ? 'Bỏ yêu thích'
+                      : 'Thêm vào yêu thích',
                 ),
-                onPressed: onFavoriteToggle,
-                tooltip: record.isFavorite
-                    ? 'Remove from favorites'
-                    : 'Add to favorites',
-              ),
-              PopupMenuButton<_Action>(
-                icon: Icon(Icons.more_vert, size: 20,
-                    color: Theme.of(context)
-                        .colorScheme.onSurface.withValues(alpha: 0.5)),
-                itemBuilder: (_) => [
-                  const PopupMenuItem(
-                    value: _Action.open,
-                    child: Row(children: [
-                      Icon(Icons.open_in_new, size: 18),
-                      SizedBox(width: 10),
-                      Text('Mở'),
-                    ]),
-                  ),
-                  PopupMenuItem(
-                    value: _Action.remove,
-                    child: Row(children: [
-                      Icon(Icons.delete_outline, size: 18,
-                          color: Theme.of(context).colorScheme.error),
-                      const SizedBox(width: 10),
-                      Text('Xóa khỏi lịch sử',
-                          style: TextStyle(
-                              color: Theme.of(context).colorScheme.error)),
-                    ]),
-                  ),
-                ],
-                onSelected: (action) {
-                  if (action == _Action.open)   onTap();
-                  if (action == _Action.remove) onRemove();
-                },
-              ),
+                PopupMenuButton<_Action>(
+                  icon: Icon(Icons.more_vert, size: 20,
+                      color: Theme.of(context)
+                          .colorScheme.onSurface.withValues(alpha: 0.5)),
+                  itemBuilder: (_) => [
+                    const PopupMenuItem(
+                      value: _Action.open,
+                      child: Row(children: [
+                        Icon(Icons.open_in_new, size: 18),
+                        SizedBox(width: 10),
+                        Text('Mở'),
+                      ]),
+                    ),
+                    PopupMenuItem(
+                      value: _Action.remove,
+                      child: Row(children: [
+                        Icon(Icons.delete_outline, size: 18,
+                            color: Theme.of(context).colorScheme.error),
+                        const SizedBox(width: 10),
+                        Text('Xóa khỏi lịch sử',
+                            style: TextStyle(
+                                color: Theme.of(context).colorScheme.error)),
+                      ]),
+                    ),
+                  ],
+                  onSelected: (action) {
+                    if (action == _Action.open)   onTap();
+                    if (action == _Action.remove) onRemove();
+                  },
+                ),
+              ],
             ],
           ),
         ),
