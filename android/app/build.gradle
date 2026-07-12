@@ -24,6 +24,31 @@ if (flutterVersionName == null) {
     flutterVersionName = "1.0.0"
 }
 
+// ── Release signing ──────────────────────────────────────────────────────
+// Reads from android/key.properties, which is gitignored and must be
+// created locally (see android/key.properties.example for the format and
+// android/KEYSTORE_SETUP.md for step-by-step instructions on generating
+// the actual .jks keystore with `keytool`).
+//
+// Falls back to debug signing with a build-time warning when the file is
+// absent, so `flutter build apk --release` still produces an installable
+// (but NOT Play-Store-uploadable) artifact for local testing without
+// requiring every contributor to have signing keys.
+def keystorePropertiesFile = rootProject.file("key.properties")
+def keystoreProperties = new Properties()
+def hasReleaseSigning = keystorePropertiesFile.exists()
+if (hasReleaseSigning) {
+    keystorePropertiesFile.withReader("UTF-8") { reader ->
+        keystoreProperties.load(reader)
+    }
+} else {
+    logger.warn(
+        "WARNING: android/key.properties not found — release build will be " +
+        "signed with the DEBUG key and CANNOT be uploaded to Google Play. " +
+        "See android/KEYSTORE_SETUP.md to set up real release signing."
+    )
+}
+
 android {
     namespace = "com.formuladoc.app"
 
@@ -57,14 +82,38 @@ android {
         multiDexEnabled true
     }
 
+    signingConfigs {
+        if (hasReleaseSigning) {
+            release {
+                storeFile file(keystoreProperties["storeFile"])
+                storePassword keystoreProperties["storePassword"]
+                keyAlias keystoreProperties["keyAlias"]
+                keyPassword keystoreProperties["keyPassword"]
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: replace with a real signing config before publishing.
-            // Using the debug config here only so `flutter build apk --release`
-            // produces an installable artifact out of the box.
-            signingConfig = signingConfigs.debug
+            // Uses the real release key when android/key.properties exists
+            // (see KEYSTORE_SETUP.md); otherwise falls back to the debug
+            // key so local builds still work, with a warning printed above.
+            signingConfig = hasReleaseSigning
+                ? signingConfigs.release
+                : signingConfigs.debug
+            // Deliberately OFF for the first release: R8 shrinking/
+            // obfuscation failures typically show up as RUNTIME crashes or
+            // silent misbehavior on real devices, not build errors — so a
+            // "green" CI build gives no guarantee it's actually safe.
+            // Given several plugins here (pdfx, flutter_tts,
+            // receive_sharing_intent) aren't guaranteed to have complete
+            // consumer ProGuard rules, enabling this needs real on-device
+            // testing first. proguard-rules.pro is wired up and ready —
+            // flip minifyEnabled/shrinkResources to true once verified.
             minifyEnabled false
             shrinkResources false
+            proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"),
+                           "proguard-rules.pro"
         }
         debug {
             applicationIdSuffix = ".debug"
